@@ -2,13 +2,14 @@
 #include <vector>
 #include <algorithm>
 #include <initializer_list>
+#include "fixed_vector.h"
 
 
 // flat set (aka sorted vector)
 template <
     class Key,
     class Compare = std::less<>,
-    class Allocator = std::allocator<Key>
+    class Container = std::vector<Key, std::allocator<Key>>
 >
 class flat_set
 {
@@ -19,29 +20,25 @@ public:
     using difference_type        = std::ptrdiff_t;
     using key_compare            = Compare;
     using value_compare          = Compare;
-    using allocator_type         = Allocator;
     using reference              = Key&;
     using const_reference        = const Key&;
-    using pointer                = typename std::allocator_traits<allocator_type>::pointer;
-    using const_pointer          = typename std::allocator_traits<allocator_type>::const_pointer;
-    using vector_type            = std::vector<value_type, allocator_type>;
-    using iterator               = typename vector_type::iterator;
-    using const_iterator         = typename vector_type::const_iterator;
-    using reverse_iterator       = typename vector_type::reverse_iterator;
-    using const_reverse_iterator = typename vector_type::const_reverse_iterator;
-
+    using pointer                = Key*;
+    using const_pointer          = const Key*;
+    using container_type         = Container;
+    using iterator               = typename container_type::iterator;
+    using const_iterator         = typename container_type::const_iterator;
 
 
     flat_set() {}
     flat_set(const flat_set& v)
-        : m_data(v.m_data)
+        : data_(v.data_)
     {
     }
     flat_set(flat_set&& v) noexcept { swap(v); }
 
     flat_set& operator=(const flat_set& v)
     {
-        m_data = v.m_data;
+        data_ = v.data_;
         return *this;
     }
     flat_set& operator=(flat_set&& v) noexcept
@@ -52,66 +49,58 @@ public:
 
     void swap(flat_set& v) noexcept
     {
-        m_data.swap(v.m_data);
+        data_.swap(v.data_);
     }
     // v must be sorted or call sort() after swap()
-    void swap(vector_type& v) noexcept
+    void swap(container_type& v) noexcept
     {
-        m_data.swap(v);
+        data_.swap(v);
     }
 
     // representation
 
-    vector_type& get() { return m_data; }
-    const vector_type& get() const { return m_data; }
+    container_type& get() { return data_; }
+    const container_type& get() const { return data_; }
 
-    vector_type&& extract() { return std::move(m_data); }
+    container_type&& extract() { return std::move(data_); }
 
     // compare
 
-    bool operator==(const flat_set& v) const { return m_data == v.m_data; }
-    bool operator!=(const flat_set& v) const { return m_data != v.m_data; }
+    bool operator==(const flat_set& v) const { return data_ == v.data_; }
+    bool operator!=(const flat_set& v) const { return data_ != v.data_; }
 
     // resize & clear
 
-    void reserve(size_type v) { m_data.reserve(v); }
+    void reserve(size_type v) { data_.reserve(v); }
 
     // resize() may break the order. sort() should be called in that case.
-    void resize(size_type v) { m_data.resize(v); }
+    void resize(size_type v) { data_.resize(v); }
 
-    void clear() { m_data.clear(); }
+    void clear() { data_.clear(); }
 
-    void shrink_to_fit() { m_data.shrink_to_fit(); }
+    void shrink_to_fit() { data_.shrink_to_fit(); }
 
     // for the case m_data is directry modified (resize(), swap(), get(), etc)
     void sort() { std::sort(begin(), end(), key_compare()); }
 
     // size & data
 
-    size_type empty() const { return m_data.empty(); }
+    size_type empty() const { return data_.empty(); }
 
-    size_type size() const { return m_data.size(); }
+    size_type size() const { return data_.size(); }
 
-    pointer data() { return m_data.data(); }
-    const_pointer data() const { return m_data.data(); }
+    pointer data() { return data_.data(); }
+    const_pointer data() const { return data_.data(); }
 
     // iterator
 
-    iterator begin() noexcept { return m_data.begin(); }
-    const_iterator begin() const noexcept { return m_data.begin(); }
-    constexpr const_iterator cbegin() const noexcept { return m_data.cbegin(); }
+    iterator begin() noexcept { return data_.begin(); }
+    const_iterator begin() const noexcept { return data_.begin(); }
+    constexpr const_iterator cbegin() const noexcept { return data_.cbegin(); }
 
-    iterator end() noexcept { return m_data.end(); }
-    const_iterator end() const noexcept { return m_data.end(); }
-    constexpr const_iterator cend() const noexcept { return m_data.cend(); }
-
-    reverse_iterator rbegin() noexcept { return m_data.rbegin(); }
-    const_reverse_iterator rbegin() const noexcept { return m_data.rbegin(); }
-    constexpr const_reverse_iterator crbegin() const noexcept { return m_data.crbegin(); }
-
-    reverse_iterator rend() noexcept { return m_data.rend(); }
-    const_reverse_iterator rend() const noexcept { return m_data.rend(); }
-    constexpr const_reverse_iterator crend() const noexcept { return m_data.crend(); }
+    iterator end() noexcept { return data_.end(); }
+    const_iterator end() const noexcept { return data_.end(); }
+    constexpr const_iterator cend() const noexcept { return data_.cend(); }
 
     // search
 
@@ -211,7 +200,7 @@ public:
     {
         auto it = lower_bound(v);
         if (it == end() || !equal(*it, v))
-            return { m_data.insert(it, v), true };
+            return { data_.insert(it, v), true };
         else
             return { it, false };
     }
@@ -219,7 +208,7 @@ public:
     {
         auto it = lower_bound(v);
         if (it == end() || !equal(*it, v))
-            return { m_data.insert(it, v), true };
+            return { data_.insert(it, v), true };
         else
             return { it, false };
     }
@@ -231,24 +220,23 @@ public:
     }
     void insert(std::initializer_list<value_type> list)
     {
-        for (auto& v : list)
-            insert(v);
+        insert(list.begin(), list.end());
     }
 
     iterator erase(const value_type& v)
     {
         if (auto it = find(v); it != end())
-            return m_data.erase(it);
+            return data_.erase(it);
         else
             return end();
     }
     iterator erase(iterator pos)
     {
-        return m_data.erase(pos);
+        return data_.erase(pos);
     }
     iterator erase(iterator first, iterator last)
     {
-        return m_data.erase(first, last);
+        return data_.erase(first, last);
     }
 
 private:
@@ -263,5 +251,13 @@ private:
     }
 
 private:
-    vector_type m_data;
+    container_type data_;
 };
+
+
+template <
+    class Key,
+    size_t Capacity,
+    class Compare = std::less<>
+>
+using fixed_set = flat_set<Key, Compare, fixed_vector<Key, Capacity>>;
