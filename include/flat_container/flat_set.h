@@ -36,6 +36,12 @@ public:
     }
     flat_set(flat_set&& v) noexcept { swap(v); }
 
+    template<bool view = impl::is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
+    flat_set(void* data, size_t capacity)
+        : data_(data, capacity)
+    {
+    }
+
     flat_set& operator=(const flat_set& v)
     {
         data_ = v.data_;
@@ -261,3 +267,9 @@ template <
     class Compare = std::less<>
 >
 using fixed_set = flat_set<Key, Compare, fixed_vector<Key, Capacity>>;
+
+template <
+    class Key,
+    class Compare = std::less<>
+>
+using set_view = flat_set<Key, Compare, vector_view<Key>>;

@@ -37,6 +37,12 @@ public:
     }
     flat_map(flat_map&& v) noexcept { swap(v); }
 
+    template<bool view = impl::is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
+    flat_map(void* data, size_t capacity)
+        : data_(data, capacity)
+    {
+    }
+
     flat_map& operator=(const flat_map& v)
     {
         data_ = v.data_;
@@ -306,3 +312,10 @@ template <
     class Compare = std::less<>
 >
 using fixed_map = flat_map<Key, Value, Compare, fixed_vector<std::pair<Key, Value>, Capacity>>;
+
+template <
+    class Key,
+    class Value,
+    class Compare = std::less<>
+>
+using map_view = flat_map<Key, Value, Compare, vector_view<std::pair<Key, Value>>>;

@@ -11,35 +11,45 @@ testCase(test_flat_set)
     flat_set<std::string> fset;
     fixed_set<std::string, 32> xset;
 
+    std::byte buf[sizeof(std::string) * 32];
+    set_view<std::string> vset(buf, 32);
+
     auto check = [&]() {
         testExpect(sset.size() == fset.size());
         testExpect(sset.size() == xset.size());
+        testExpect(sset.size() == vset.size());
 
         auto i1 = sset.begin();
         auto i2 = fset.begin();
         auto i3 = xset.begin();
+        auto i4 = vset.begin();
         while (i1 != sset.end()) {
             testExpect(*i1 == *i2);
             testExpect(*i1 == *i3);
+            testExpect(*i1 == *i4);
             ++i1;
             ++i2;
             ++i3;
+            ++i4;
         }
     };
     auto insert = [&](const std::string& v) {
         sset.insert(v);
         fset.insert(v);
         xset.insert(v);
+        vset.insert(v);
     };
     auto insert_il = [&](std::initializer_list<std::string>&& v) {
         sset.insert(v);
         fset.insert(v);
         xset.insert(v);
+        vset.insert(v);
     };
     auto erase = [&](const std::string& v) {
         sset.erase(v);
         fset.erase(v);
         xset.erase(v);
+        vset.erase(v);
     };
 
     std::string data[]{
@@ -73,35 +83,45 @@ testCase(test_flat_map)
     flat_map<std::string, int> fmap;
     fixed_map<std::string, int, 32> xmap;
 
+    std::byte buf[sizeof(std::pair<std::string, int>) * 32];
+    map_view<std::string, int> vmap(buf, 32);
+
     auto check = [&]() {
         testExpect(smap.size() == fmap.size());
         testExpect(smap.size() == xmap.size());
+        testExpect(smap.size() == vmap.size());
 
         auto i1 = smap.begin();
         auto i2 = fmap.begin();
         auto i3 = xmap.begin();
+        auto i4 = vmap.begin();
         while (i1 != smap.end()) {
             testExpect(i1->first == i2->first); testExpect(i1->second == i2->second);
             testExpect(i1->first == i3->first); testExpect(i1->second == i3->second);
+            testExpect(i1->first == i4->first); testExpect(i1->second == i4->second);
             ++i1;
             ++i2;
             ++i3;
+            ++i4;
         }
     };
     auto insert = [&](const std::pair<std::string, int>& v) {
         smap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
+        vmap.insert(v);
     };
     auto insert_il = [&](std::initializer_list<std::pair<const std::string, int>>&& v) {
         smap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
+        vmap.insert(v);
     };
     auto erase = [&](const std::string& v) {
         smap.erase(v);
         fmap.erase(v);
         xmap.erase(v);
+        vmap.erase(v);
     };
 
     std::pair<std::string, int> data[]{
@@ -160,4 +180,12 @@ testCase(test_fixed_vector)
     for (size_t i = 0; i < data.size(); ++i) {
         testExpect(data[i] == data3[i]);
     }
+
+    printf("impl::is_memory_view_v<fixed_vector<int, 1>>: %d\n",
+        impl::is_memory_view_v<fixed_vector<int, 1>> ? 1 : 0);
+    printf("impl::is_memory_view_v<vector_view<int>>: %d\n",
+        impl::is_memory_view_v<vector_view<int>> ? 1 : 0);
+
+    printf("vector_view<int>::is_memory_view: %d\n",
+        (int)vector_view<int>::is_memory_view);
 }
