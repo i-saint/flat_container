@@ -158,13 +158,18 @@ testCase(test_fixed_vector)
     for (int i = 0; i < 128; ++i) {
         tmp += ' ' + i % 90;
 
-        switch (i % 6) {
+        switch (i % 7) {
         case 0: data.push_back(tmp); break;
-        case 1: data.emplace_back(tmp); break;
-        case 2: data.resize(data.size() + 1, tmp); break;
-        case 3: data.insert(data.end(), tmp); break;
-        case 4: data.insert(data.end(), &tmp, &tmp + 1); break;
-        case 5: data.insert(data.end(), std::initializer_list<std::string>{tmp}); break;
+        case 1: {
+            auto t = tmp;
+            data.push_back(std::move(t));
+            break;
+        }
+        case 2: data.emplace_back(tmp); break;
+        case 3: data.resize(data.size() + 1, tmp); break;
+        case 4: data.insert(data.end(), tmp); break;
+        case 5: data.insert(data.end(), &tmp, &tmp + 1); break;
+        case 6: data.insert(data.end(), std::initializer_list<std::string>{tmp}); break;
         }
     }
 

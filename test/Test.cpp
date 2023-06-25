@@ -53,7 +53,7 @@ void PutsImpl(const char* s)
 #ifdef _WIN32
     ::OutputDebugStringA(s);
 #endif
-    printf(s);
+    printf("%s", s);
 }
 
 struct ArgEntry
