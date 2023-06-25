@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="impl::fixed_vector_impl&lt;*&gt;">
+  <Type Name="ist::basic_fixed_vector&lt;*&gt;">
     <DisplayString>{{ size={size_} }}</DisplayString>
     <Expand>
       <Item Name="[size]">size_</Item>
@@ -11,15 +11,17 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="flat_map&lt;*&gt;">
-    <DisplayString>{{ size={data_.size()} }}</DisplayString>
+  <Type Name="ist::flat_set&lt;*,*,*&gt;">
+    <DisplayString>{data_}</DisplayString>
     <Expand>
+      <Item Name="[comparator]">*($T2*)this</Item>
       <ExpandedItem>data_</ExpandedItem>
     </Expand>
   </Type>
-  <Type Name="flat_set&lt;*&gt;">
-    <DisplayString>{{ size={data_.size()} }}</DisplayString>
+  <Type Name="ist::flat_map&lt;*,*,*,*&gt;">
+    <DisplayString>{data_}</DisplayString>
     <Expand>
+      <Item Name="[comparator]">*($T3*)this</Item>
       <ExpandedItem>data_</ExpandedItem>
     </Expand>
   </Type>

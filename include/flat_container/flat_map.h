@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include "fixed_vector.h"
 
+namespace ist {
 
 // flat map (std::map-like sorted vector)
 template <
@@ -37,7 +38,7 @@ public:
     }
     flat_map(flat_map&& v) noexcept { swap(v); }
 
-    template<bool view = impl::is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
+    template<bool view = is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
     flat_map(void* data, size_t capacity)
         : data_(data, capacity)
     {
@@ -319,3 +320,5 @@ template <
     class Compare = std::less<>
 >
 using map_view = flat_map<Key, Value, Compare, vector_view<std::pair<Key, Value>>>;
+
+} // namespace ist

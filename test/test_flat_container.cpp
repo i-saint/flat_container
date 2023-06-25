@@ -8,11 +8,11 @@
 testCase(test_flat_set)
 {
     std::set<std::string> sset;
-    flat_set<std::string> fset;
-    fixed_set<std::string, 32> xset;
+    ist::flat_set<std::string> fset;
+    ist::fixed_set<std::string, 32> xset;
 
     std::byte buf[sizeof(std::string) * 32];
-    set_view<std::string> vset(buf, 32);
+    ist::set_view<std::string> vset(buf, 32);
 
     auto check = [&]() {
         testExpect(sset.size() == fset.size());
@@ -80,11 +80,11 @@ testCase(test_flat_set)
 testCase(test_flat_map)
 {
     std::map<std::string, int> smap;
-    flat_map<std::string, int> fmap;
-    fixed_map<std::string, int, 32> xmap;
+    ist::flat_map<std::string, int> fmap;
+    ist::fixed_map<std::string, int, 32> xmap;
 
     std::byte buf[sizeof(std::pair<std::string, int>) * 32];
-    map_view<std::string, int> vmap(buf, 32);
+    ist::map_view<std::string, int> vmap(buf, 32);
 
     auto check = [&]() {
         testExpect(smap.size() == fmap.size());
@@ -152,7 +152,7 @@ testCase(test_flat_map)
 
 testCase(test_fixed_vector)
 {
-    fixed_vector<std::string, 128> data, data2, data3;
+    ist::fixed_vector<std::string, 128> data, data2, data3;
 
     std::string tmp;
     for (int i = 0; i < 128; ++i) {
@@ -186,11 +186,11 @@ testCase(test_fixed_vector)
         testExpect(data[i] == data3[i]);
     }
 
-    printf("impl::is_memory_view_v<fixed_vector<int, 1>>: %d\n",
-        impl::is_memory_view_v<fixed_vector<int, 1>> ? 1 : 0);
-    printf("impl::is_memory_view_v<vector_view<int>>: %d\n",
-        impl::is_memory_view_v<vector_view<int>> ? 1 : 0);
+    printf("is_memory_view_v<fixed_vector<int, 1>>: %d\n",
+        ist::is_memory_view_v<ist::fixed_vector<int, 1>> ? 1 : 0);
+    printf("is_memory_view_v<vector_view<int>>: %d\n",
+        ist::is_memory_view_v<ist::vector_view<int>> ? 1 : 0);
 
     printf("vector_view<int>::is_memory_view: %d\n",
-        (int)vector_view<int>::is_memory_view);
+        (int)ist::vector_view<int>::is_memory_view);
 }

@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include "fixed_vector.h"
 
+namespace ist {
 
 // flat set (aka sorted vector)
 template <
@@ -36,7 +37,7 @@ public:
     }
     flat_set(flat_set&& v) noexcept { swap(v); }
 
-    template<bool view = impl::is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
+    template<bool view = is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
     flat_set(void* data, size_t capacity)
         : data_(data, capacity)
     {
@@ -273,3 +274,5 @@ template <
     class Compare = std::less<>
 >
 using set_view = flat_set<Key, Compare, vector_view<Key>>;
+
+} // namespace ist
