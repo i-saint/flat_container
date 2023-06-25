@@ -28,10 +28,7 @@ testCase(test_flat_set)
             testExpect(*i1 == *i2);
             testExpect(*i1 == *i3);
             testExpect(*i1 == *i4);
-            ++i1;
-            ++i2;
-            ++i3;
-            ++i4;
+            ++i1; ++i2; ++i3; ++i4;
         }
     };
     auto insert = [&](const std::string& v) {
@@ -100,10 +97,7 @@ testCase(test_flat_map)
             testExpect(i1->first == i2->first); testExpect(i1->second == i2->second);
             testExpect(i1->first == i3->first); testExpect(i1->second == i3->second);
             testExpect(i1->first == i4->first); testExpect(i1->second == i4->second);
-            ++i1;
-            ++i2;
-            ++i3;
-            ++i4;
+            ++i1; ++i2; ++i3; ++i4;
         }
     };
     auto insert = [&](const std::pair<std::string, int>& v) {
@@ -167,6 +161,10 @@ testCase(test_fixed_vector)
         // basic tests
         ist::fixed_vector<std::string, 128> data, data2, data3;
 
+        std::byte buf1[sizeof(std::string) * 128];
+        std::byte buf2[sizeof(std::string) * 128];
+        ist::vector_view<std::string> view(buf1, 128), view2(buf2, 128);
+
         std::string tmp;
         for (int i = 0; i < 64; ++i) {
             tmp += ' ' + char(i);
@@ -198,6 +196,8 @@ testCase(test_fixed_vector)
         for (size_t i = 0; i < data.size(); ++i) {
             testExpect(data[i] == data3[i]);
         }
+
+        //view = view2;
     }
 
     {

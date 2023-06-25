@@ -9,7 +9,10 @@ template<class T, size_t Capacity>
 class fixed_memory
 {
 public:
+    // suppress warning for uninitialized members
+#pragma warning(disable:26495)
     fixed_memory() {}
+#pragma warning(default:26495)
     ~fixed_memory() {}
     constexpr static size_t capacity() { return capacity_; }
     constexpr size_t size() const { return size_; }
@@ -21,7 +24,7 @@ public:
     size_t size_ = 0;
     union {
         T data_[0]; // for debug
-        std::byte buffer_[sizeof(T) * Capacity]; // uninitialized
+        std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
     };
 };
 
@@ -33,7 +36,7 @@ public:
     static const bool is_trivially_swappable = true;
 
     memory_view() {}
-    memory_view(void* data, size_t capacity) : capacity_(capacity), data_((T*)data) {}
+    memory_view(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
     constexpr size_t capacity() { return capacity_; }
     constexpr size_t size() const { return size_; }
     constexpr T* data() { return data_; }
@@ -70,24 +73,26 @@ public:
     using const_iterator = const_pointer;
 
     constexpr basic_fixed_vector() {}
-    constexpr basic_fixed_vector(const basic_fixed_vector& r) noexcept { operator=(r); }
     constexpr basic_fixed_vector(basic_fixed_vector&& r) noexcept { operator=(std::move(r)); }
 
-    template<bool view = is_memory_view_v<Memory>, std::enable_if_t<!view, bool> = true>
+    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
+    constexpr basic_fixed_vector(const basic_fixed_vector& r) noexcept { operator=(r); }
+
+    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
     constexpr explicit basic_fixed_vector(size_t n) { resize(n); }
 
-    template<bool view = is_memory_view_v<Memory>, std::enable_if_t<!view, bool> = true>
+    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
     constexpr basic_fixed_vector(size_t n, const T& v) { resize(n, v); }
 
-    template<bool view = is_memory_view_v<Memory>, std::enable_if_t<!view, bool> = true>
+    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
     constexpr basic_fixed_vector(std::initializer_list<T> r) { assign(r); }
 
-    template<class ForwardIter, bool view = is_memory_view_v<Memory>, std::enable_if_t<!view, bool> = true>
+    template<class ForwardIter, bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
     constexpr basic_fixed_vector(ForwardIter first, ForwardIter last) { assign(first, last); }
 
-    template<bool view = is_memory_view_v<Memory>, std::enable_if_t<view, bool> = true>
-    constexpr basic_fixed_vector(void* data, size_t capacity)
-        : Memory(data, capacity)
+    template<bool view = is_memory_view_v<super>, std::enable_if_t<view, bool> = true>
+    constexpr basic_fixed_vector(void* data, size_t capacity, size_t size = 0)
+        : Memory(data, capacity, size)
     {
     }
 
@@ -95,7 +100,7 @@ public:
 
     constexpr void swap(basic_fixed_vector& r)
     {
-        if constexpr (is_trivially_swappable_v<Memory>) {
+        if constexpr (is_trivially_swappable_v<super>) {
             std::swap(capacity_, r.capacity_);
             std::swap(size_, r.size_);
             std::swap(data_, r.data_);
@@ -125,12 +130,17 @@ public:
 
     constexpr basic_fixed_vector& operator=(const basic_fixed_vector& r) noexcept
     {
-        assign(r.begin(), r.end());
+        if constexpr (!is_memory_view_v<super>) {
+            assign(r.begin(), r.end());
+        }
+        else {
+            static_assert(!is_memory_view_v<super>);
+        }
         return *this;
     }
     constexpr basic_fixed_vector& operator=(basic_fixed_vector&& r) noexcept
     {
-        if constexpr (is_trivially_swappable_v<Memory>) {
+        if constexpr (is_trivially_swappable_v<super>) {
             swap(r);
         }
         else {

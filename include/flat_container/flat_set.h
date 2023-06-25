@@ -38,8 +38,8 @@ public:
     flat_set(flat_set&& v) noexcept { swap(v); }
 
     template<bool view = is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
-    flat_set(void* data, size_t capacity)
-        : data_(data, capacity)
+    flat_set(void* data, size_t capacity, size_t size = 0)
+        : data_(data, capacity, size)
     {
     }
 
