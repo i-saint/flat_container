@@ -92,7 +92,7 @@ public:
 
     template<bool view = is_memory_view_v<super>, std::enable_if_t<view, bool> = true>
     constexpr basic_fixed_vector(void* data, size_t capacity, size_t size = 0)
-        : Memory(data, capacity, size)
+        : super(data, capacity, size)
     {
     }
 
@@ -134,6 +134,7 @@ public:
             assign(r.begin(), r.end());
         }
         else {
+            // forbid copy if memory view
             static_assert(!is_memory_view_v<super>);
         }
         return *this;

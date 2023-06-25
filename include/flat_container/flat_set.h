@@ -31,11 +31,19 @@ public:
 
 
     flat_set() {}
-    flat_set(const flat_set& v)
-        : data_(v.data_)
+    flat_set(const flat_set& v) { operator=(v); }
+    flat_set(flat_set&& v) noexcept { operator=(std::move(v)); }
+
+    template <class Iter, bool view = is_memory_view_v<container_type>, std::enable_if_t<!view, bool> = true>
+    flat_set(Iter first, Iter last)
     {
+        insert(first, last);
     }
-    flat_set(flat_set&& v) noexcept { swap(v); }
+    template <bool view = is_memory_view_v<container_type>, std::enable_if_t<!view, bool> = true>
+    flat_set(std::initializer_list<value_type> list)
+    {
+        insert(list);
+    }
 
     template<bool view = is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
     flat_set(void* data, size_t capacity, size_t size = 0)

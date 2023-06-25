@@ -32,11 +32,19 @@ public:
     using const_iterator         = typename container_type::const_iterator;
 
     flat_map() {}
-    flat_map(const flat_map& v)
-        : data_(v.data_)
+    flat_map(const flat_map& v) { operator=(v); }
+    flat_map(flat_map&& v) noexcept { operator=(std::move(v)); }
+
+    template <class Iter, bool view = is_memory_view_v<container_type>, std::enable_if_t<!view, bool> = true>
+    flat_map(Iter first, Iter last)
     {
+        insert(first, last);
     }
-    flat_map(flat_map&& v) noexcept { swap(v); }
+    template <bool view = is_memory_view_v<container_type>, std::enable_if_t<!view, bool> = true>
+    flat_map(std::initializer_list<value_type> list)
+    {
+        insert(list);
+    }
 
     template<bool view = is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
     flat_map(void* data, size_t capacity, size_t size = 0)
