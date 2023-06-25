@@ -4,6 +4,7 @@
 #include "flat_container/fixed_vector.h"
 #include <set>
 #include <map>
+#include <memory>
 
 testCase(test_flat_set)
 {
@@ -152,45 +153,104 @@ testCase(test_flat_map)
 
 testCase(test_fixed_vector)
 {
-    ist::fixed_vector<std::string, 128> data, data2, data3;
+    printf("is_memory_view_v<ist::fixed_vector<int, 8>>: %d\n",
+        (int)ist::is_memory_view_v<ist::fixed_vector<int, 8>>);
+    printf("is_memory_view_v<ist::vector_view<int>>: %d\n",
+        (int)ist::is_memory_view_v<ist::vector_view<int>>);
 
-    std::string tmp;
-    for (int i = 0; i < 128; ++i) {
-        tmp += ' ' + i % 90;
+    printf("is_trivially_swappable_v<ist::fixed_vector<int, 8>>: %d\n",
+        (int)ist::is_trivially_swappable_v<ist::fixed_vector<int, 8>>);
+    printf("is_trivially_swappable_v<ist::vector_view<int>>: %d\n",
+        (int)ist::is_trivially_swappable_v<ist::vector_view<int>>);
 
-        switch (i % 7) {
-        case 0: data.push_back(tmp); break;
-        case 1: {
-            auto t = tmp;
-            data.push_back(std::move(t));
-            break;
+    {
+        // basic tests
+        ist::fixed_vector<std::string, 128> data, data2, data3;
+
+        std::string tmp;
+        for (int i = 0; i < 64; ++i) {
+            tmp += ' ' + char(i);
+
+            switch (i % 7) {
+            case 0: data.push_back(tmp); break;
+            case 1: {
+                auto t = tmp;
+                data.push_back(std::move(t));
+                break;
+            }
+            case 2: data.emplace_back(tmp); break;
+            case 3: data.resize(data.size() + 1, tmp); break;
+            case 4: data.insert(data.begin(), tmp); break;
+            case 5: data.insert(data.begin(), &tmp, &tmp + 1); break;
+            case 6: data.insert(data.begin(), std::initializer_list<std::string>{tmp}); break;
+            }
         }
-        case 2: data.emplace_back(tmp); break;
-        case 3: data.resize(data.size() + 1, tmp); break;
-        case 4: data.insert(data.end(), tmp); break;
-        case 5: data.insert(data.end(), &tmp, &tmp + 1); break;
-        case 6: data.insert(data.end(), std::initializer_list<std::string>{tmp}); break;
+
+        data.erase(data.begin() + 32, data.begin() + 40);
+        testExpect(data.size() == 56);
+
+        data2 = data;
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data2[i]);
+        }
+
+        data3 = std::move(data2);
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data3[i]);
         }
     }
 
-    data.erase(data.begin() + 100, data.begin() + 108);
-    testExpect(data.size() == 120);
+    {
+        // with non-copyable element
+        class elem
+        {
+        public:
+            elem(const std::string& v) : value(v) {}
+            elem() = delete;
+            elem(const elem&) = delete;
+            elem(elem&&) = default;
+            elem& operator=(const elem&) = delete;
+            elem& operator=(elem&&) = default;
+            bool operator==(const elem& v) const { return value == v.value; }
 
-    data2 = data;
-    for (size_t i = 0; i < data.size(); ++i) {
-        testExpect(data[i] == data2[i]);
+            std::string value;
+        };
+
+        ist::fixed_vector<elem, 128> data, data2, data3, data4;
+        //std::vector<elem> data, data2, data3;
+
+        std::string tmp;
+        for (int i = 0; i < 64; ++i) {
+            tmp += ' ' + char(i);
+
+            switch (i % 3) {
+            case 0: data.push_back(elem(tmp)); break;
+            case 1: data.emplace_back(tmp); break;
+            case 2: data.insert(data.begin(), elem(tmp)); break;
+            }
+        }
+
+        data.erase(data.begin() + 32, data.begin() + 40);
+        testExpect(data.size() == 56);
+
+        for (size_t i = 0; i < data.size(); ++i) {
+            data2.push_back(elem(data[i].value));
+        }
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data2[i]);
+        }
+
+        data3 = std::move(data2);
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data3[i]);
+        }
+
+        data4.push_back(elem("abc"));
+        data4.push_back(elem("def"));
+        data4.swap(data3);
+        testExpect(data3.size() == 2);
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data4[i]);
+        }
     }
-
-    data3 = std::move(data2);
-    for (size_t i = 0; i < data.size(); ++i) {
-        testExpect(data[i] == data3[i]);
-    }
-
-    printf("is_memory_view_v<fixed_vector<int, 1>>: %d\n",
-        ist::is_memory_view_v<ist::fixed_vector<int, 1>> ? 1 : 0);
-    printf("is_memory_view_v<vector_view<int>>: %d\n",
-        ist::is_memory_view_v<ist::vector_view<int>> ? 1 : 0);
-
-    printf("vector_view<int>::is_memory_view: %d\n",
-        (int)ist::vector_view<int>::is_memory_view);
 }
