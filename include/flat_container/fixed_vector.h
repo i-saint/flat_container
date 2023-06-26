@@ -3,6 +3,13 @@
 #include <type_traits>
 #include <cstddef>
 
+#ifdef _DEBUG
+#   if !defined(FC_ENABLE_CAPACITY_CHECK)
+#       define FC_ENABLE_CAPACITY_CHECK
+#   endif
+#endif
+
+
 namespace ist {
 
 template<class T, size_t Capacity>
@@ -179,26 +186,26 @@ public:
 
     constexpr void resize(size_t n)
     {
-        resize_impl(n, [&](T* addr, size_t) { new (addr) T(); });
+        resize_impl(n, [&](T* addr) { new (addr) T(); });
     }
     constexpr void resize(size_t n, const T& v)
     {
-        resize_impl(n, [&](T* addr, size_t) { new (addr) T(v); });
+        resize_impl(n, [&](T* addr) { new (addr) T(v); });
     }
 
     constexpr void push_back(const T& v)
     {
-        expand(1, [&](T* addr, size_t) { new (addr) T(v); });
+        expand(1, [&](T* addr) { new (addr) T(v); });
     }
     constexpr void push_back(T&& v)
     {
-        expand(1, [&](T* addr, size_t) { new (addr) T(std::move(v)); });
+        expand(1, [&](T* addr) { new (addr) T(std::move(v)); });
     }
 
     template< class... Args >
     constexpr T& emplace_back(Args&&... args)
     {
-        expand(1, [&](T* addr, size_t) { new (addr) T(std::forward<Args>(args)...); });
+        expand(1, [&](T* addr) { new (addr) T(std::forward<Args>(args)...); });
         return back();
     }
 
@@ -334,7 +341,7 @@ private:
         size_t new_size = size_ + n;
         capacity_check(new_size);
         for (size_t i = size_; i < new_size; ++i) {
-            construct(data_ + i, i);
+            construct(data_ + i);
         }
         size_ = new_size;
     }
@@ -376,9 +383,9 @@ private:
         return dst;
     }
 
-    constexpr void capacity_check(size_t n)
+    constexpr void capacity_check(size_t n) const
     {
-#ifdef _DEBUG
+#ifdef FC_ENABLE_CAPACITY_CHECK
         if (n > capacity()) {
             throw std::out_of_range("fixed_vector: out of range");
         }
