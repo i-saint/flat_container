@@ -266,6 +266,37 @@ private:
     container_type data_;
 };
 
+template<class K, class Comp, class Cont1, class Cont2>
+bool operator==(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+{
+    return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin());
+}
+template<class K, class Comp, class Cont1, class Cont2>
+bool operator!=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+{
+    return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin());
+}
+template<class K, class Comp, class Cont1, class Cont2>
+bool operator<(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+{
+    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
+}
+template<class K, class Comp, class Cont1, class Cont2>
+bool operator>(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+{
+    return r < l;
+}
+template<class K, class Comp, class Cont1, class Cont2>
+bool operator<=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+{
+    return !(r < l);
+}
+template<class K, class Comp, class Cont1, class Cont2>
+bool operator>=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+{
+    return !(l < r);
+}
+
 
 template <
     class Key,
@@ -281,3 +312,14 @@ template <
 using set_view = flat_set<Key, Compare, vector_view<Key>>;
 
 } // namespace ist
+
+
+namespace std {
+
+template<class K, class Comp, class Cont>
+void swap(ist::flat_set<K, Comp, Cont>& l, ist::flat_set<K, Comp, Cont>& r) noexcept
+{
+    l.swap(r);
+}
+
+} // namespace std

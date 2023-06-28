@@ -49,6 +49,7 @@ public:
    ~dynamic_memory() { release(); }
     constexpr size_t capacity() noexcept { return capacity_; }
     constexpr size_t size() const noexcept { return size_; }
+    constexpr size_t size_bytes() const noexcept { return sizeof(T) * size_; }
     constexpr T* data() noexcept { return data_; }
     constexpr const T* data() const noexcept { return data_; }
 
@@ -126,6 +127,7 @@ public:
 
     constexpr static size_t capacity() noexcept { return capacity_; }
     constexpr size_t size() const noexcept { return size_; }
+    constexpr size_t size_bytes() const noexcept { return sizeof(T) * size_; }
     constexpr T* data() noexcept { return data_; }
     constexpr const T* data() const noexcept { return data_; }
 
@@ -156,6 +158,7 @@ public:
 
     constexpr size_t capacity() noexcept { return capacity_; }
     constexpr size_t size() const noexcept { return size_; }
+    constexpr size_t size_bytes() const noexcept { return sizeof(T) * size_; }
     constexpr T* data() noexcept { return data_; }
     constexpr const T* data() const noexcept { return data_; }
 

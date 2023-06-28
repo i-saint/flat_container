@@ -76,6 +76,13 @@ testCase(test_flat_set)
     insert_il({ "abc", "def" });
     check();
 
+    testExpect(fset == xset);
+    testExpect(!(fset != xset));
+    testExpect(!(fset < xset));
+    testExpect(!(fset > xset));
+    testExpect(fset <= xset);
+    testExpect(fset >= xset);
+
     erase("c");
     erase("a");
     erase("x");
@@ -146,6 +153,13 @@ testCase(test_flat_map)
     insert_il({ {"abc", 1000}, {"def", 500} });
     check();
 
+    testExpect(fmap == xmap);
+    testExpect(!(fmap != xmap));
+    testExpect(!(fmap < xmap));
+    testExpect(!(fmap > xmap));
+    testExpect(fmap <= xmap);
+    testExpect(fmap >= xmap);
+
     erase("c");
     erase("a");
     erase("x");
@@ -185,12 +199,13 @@ testCase(test_fixed_vector)
                     dst.push_back(std::move(t));
                     break;
                 }
-                case 2: dst.emplace_back(tmp); break;
+                case 2: dst.emplace_back(tmp.c_str(), tmp.size()); break;
                 case 3: dst.resize(dst.size() + 1, tmp); break;
                 case 4: dst.insert(dst.begin(), tmp); break;
                 case 5: dst.insert(dst.begin(), &tmp, &tmp + 1); break;
                 case 6: dst.insert(dst.begin(), std::initializer_list<std::string>{tmp}); break;
                 case 7: dst.erase(dst.begin() + dst.size() / 2); break;
+                case 8: dst.emplace(dst.begin() + dst.size() / 2, tmp.c_str(), tmp.size()); break;
                 }
             }
         };
@@ -198,8 +213,19 @@ testCase(test_fixed_vector)
         make_data(ddata);
         make_data(vdata);
 
-        testExpect(std::equal(data.begin(), data.end(), ddata.begin()));
-        testExpect(std::equal(data.begin(), data.end(), vdata.begin()));
+        testExpect(data == ddata);
+        testExpect(!(data != ddata));
+        testExpect(!(data < ddata));
+        testExpect(!(data > ddata));
+        testExpect(data <= ddata);
+        testExpect(data >= ddata);
+
+        testExpect(data == vdata);
+        testExpect(!(data != vdata));
+        testExpect(!(data < vdata));
+        testExpect(!(data > vdata));
+        testExpect(data <= vdata);
+        testExpect(data >= vdata);
 
         data.erase(data.begin() + 32, data.begin() + 40);
         testExpect(data.size() == 40);
@@ -231,6 +257,7 @@ testCase(test_fixed_vector)
         {
         public:
             elem(const std::string& v) : value(v) {}
+            elem(const char* str, size_t len) : value(str, len) {}
             elem() = delete;
             elem(const elem&) = delete;
             elem(elem&&) = default;
@@ -248,10 +275,11 @@ testCase(test_fixed_vector)
         for (int i = 0; i < 64; ++i) {
             tmp += ' ' + char(i);
 
-            switch (i % 3) {
+            switch (i % 4) {
             case 0: data.push_back(elem(tmp)); break;
-            case 1: data.emplace_back(tmp); break;
+            case 1: data.emplace_back(tmp.c_str(), tmp.size()); break;
             case 2: data.insert(data.begin(), elem(tmp)); break;
+            case 3: data.emplace(data.begin(), tmp.c_str(), tmp.size()); break;
             }
         }
 
@@ -272,7 +300,7 @@ testCase(test_fixed_vector)
 
         data4.push_back(elem("abc"));
         data4.push_back(elem("def"));
-        data4.swap(data3);
+        std::swap(data4, data3);
         testExpect(data3.size() == 2);
         for (size_t i = 0; i < data.size(); ++i) {
             testExpect(data[i] == data4[i]);
@@ -298,7 +326,7 @@ testCase(test_fixed_raw_vector)
             for (int i = 0; i < 64; ++i) {
                 tmp += i;
 
-                switch (i % 8) {
+                switch (i % 9) {
                 case 0: dst.push_back(tmp); break;
                 case 1: {
                     auto t = tmp;
@@ -311,6 +339,7 @@ testCase(test_fixed_raw_vector)
                 case 5: dst.insert(dst.begin(), &tmp, &tmp + 1); break;
                 case 6: dst.insert(dst.begin(), std::initializer_list<int>{tmp}); break;
                 case 7: dst.erase(dst.begin() + dst.size() / 2); break;
+                case 8: dst.emplace(dst.begin() + dst.size() / 2, tmp); break;
                 }
             }
         };
@@ -318,11 +347,22 @@ testCase(test_fixed_raw_vector)
         make_data(ddata);
         make_data(vdata);
 
-        testExpect(std::equal(data.begin(), data.end(), ddata.begin()));
-        testExpect(std::equal(data.begin(), data.end(), vdata.begin()));
+        testExpect(data == ddata);
+        testExpect(!(data != ddata));
+        testExpect(!(data < ddata));
+        testExpect(!(data > ddata));
+        testExpect(data <= ddata);
+        testExpect(data >= ddata);
+
+        testExpect(data == vdata);
+        testExpect(!(data != vdata));
+        testExpect(!(data < vdata));
+        testExpect(!(data > vdata));
+        testExpect(data <= vdata);
+        testExpect(data >= vdata);
 
         data.erase(data.begin() + 32, data.begin() + 40);
-        testExpect(data.size() == 40);
+        testExpect(data.size() == 42);
 
         data2 = data;
         for (size_t i = 0; i < data.size(); ++i) {

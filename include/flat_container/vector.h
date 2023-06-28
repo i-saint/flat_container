@@ -96,11 +96,12 @@ public:
 
     using super::capacity;
     using super::size;
+    using super::size_bytes;
     using super::data;
     using super::reserve;
     using super::shrink_to_fit;
 
-    constexpr bool empty() const noexcept { return size_ > 0; }
+    constexpr bool empty() const noexcept { return size_ == 0; }
     constexpr bool full() const noexcept { return size_ == capacity_; }
     constexpr iterator begin() noexcept { return data_; }
     constexpr const_iterator begin() const noexcept { return data_; }
@@ -173,6 +174,10 @@ public:
         size_t n = std::distance(first, last);
         return insert_impl(pos, n, [&](T* addr) { copy_construct(addr, first, last); });
     }
+    constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
+    {
+        return insert_impl(pos, list.size(), [&](T* addr) { copy_construct(addr, list.begin(), list.end()); });
+    }
     constexpr iterator insert(iterator pos, const T& v)
     {
         return insert_impl(pos, 1, [&](T* addr) { copy_construct(addr, v, 1); });
@@ -181,9 +186,10 @@ public:
     {
         return insert_impl(pos, 1, [&](T* addr) { move_construct(addr, std::move(v)); });
     }
-    constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
+    template< class... Args >
+    constexpr iterator emplace(iterator pos, Args&&... args)
     {
-        return insert_impl(pos, list.size(), [&](T* addr) { copy_construct(addr, list.begin(), list.end()); });
+        return insert_impl(pos, 1, [&](T* addr) { emplace_construct(addr, std::forward<Args>(args)...); });
     }
 
     constexpr iterator erase(iterator first, iterator last)
@@ -242,6 +248,17 @@ private:
         }
         while (dst < end_new) {
             new (dst++) T(std::move(*first++));
+        }
+    }
+
+    template< class... Args >
+    constexpr void emplace_construct(iterator dst, Args&&... args)
+    {
+        if (dst >= data_ + size_) {
+            new (dst) T(std::forward<Args>(args)...);
+        }
+        else {
+            *dst = T(std::forward<Args>(args)...);
         }
     }
 
@@ -340,6 +357,37 @@ private:
     }
 };
 
+template<class T, class M1, class M2>
+bool operator==(const basic_vector<T, M1>& l, const basic_vector<T, M2>& r)
+{
+    return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin());
+}
+template<class T, class M1, class M2>
+bool operator!=(const basic_vector<T, M1>& l, const basic_vector<T, M2>& r)
+{
+    return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin());
+}
+template<class T, class M1, class M2>
+bool operator<(const basic_vector<T, M1>& l, const basic_vector<T, M2>& r)
+{
+    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
+}
+template<class T, class M1, class M2>
+bool operator>(const basic_vector<T, M1>& l, const basic_vector<T, M2>& r)
+{
+    return r < l;
+}
+template<class T, class M1, class M2>
+bool operator<=(const basic_vector<T, M1>& l, const basic_vector<T, M2>& r)
+{
+    return !(r < l);
+}
+template<class T, class M1, class M2>
+bool operator>=(const basic_vector<T, M1>& l, const basic_vector<T, M2>& r)
+{
+    return !(l < r);
+}
+
 
 template<class T>
 using vector = basic_vector<T, dynamic_memory<T>>;
@@ -351,3 +399,14 @@ template<class T>
 using vector_view = basic_vector<T, memory_view<T>>;
 
 } // namespace ist
+
+
+namespace std {
+
+template<class T, class M>
+void swap(ist::basic_vector<T, M>& l, ist::basic_vector<T, M>& r) noexcept
+{
+    l.swap(r);
+}
+
+} // namespace std
