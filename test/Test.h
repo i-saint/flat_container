@@ -34,7 +34,9 @@ namespace test {
 
 using nanosec = uint64_t;
 nanosec Now();
-inline float NS2MS(nanosec ns) { return float(double(ns) / 1000000.0); }
+inline double NS2US(nanosec ns) { return double(ns) / 1000.0; }
+inline double NS2MS(nanosec ns) { return double(ns) / 1000000.0; }
+inline double NS2S(nanosec ns)  { return double(ns) / 1000000000.0; }
 
 void RegisterInitializer(const std::function<void()>& init, const std::function<void()>& fini);
 void RegisterTestCaseImpl(const char* name, const std::function<void()>& body);
@@ -43,18 +45,30 @@ void PrintImpl(const char* format, ...);
 void PutsImpl(const char* format);
 template<class T> bool GetArg(const char* name, T& dst);
 
-template<class Body>
-inline void TestScope(const char *name, const Body& body, int num_try = 1)
+
+class Timer
 {
-    auto begin = Now();
+public:
+    Timer(nanosec start = Now()) : start_(start) {}
+    void reset(nanosec start = Now()) { start_ = start; }
+    nanosec elapsed_ns() { return Now() - start_; }
+    double elapsed_ms() { return NS2MS(elapsed_ns()); }
+
+private:
+    nanosec start_;
+};
+
+template<class Body>
+inline void TestScope(const char* name, const Body& body, int num_try = 1)
+{
+    Timer timer;
     for (int i = 0; i < num_try; ++i)
         body();
-    auto end = Now();
 
-    float elapsed = NS2MS(end - begin);
-    testPrint("    %s: %.2fms", name, elapsed / num_try);
+    float elapsed = timer.elapsed_ms();
+    testPrint("    %s: %.2lfms", name, elapsed / num_try);
     if (num_try > 1) {
-        testPrint(" (%.2fms in total)", elapsed);
+        testPrint(" (%.2lfms in total)", elapsed);
     }
     testPrint("\n");
 }
