@@ -2,9 +2,16 @@
 #include "flat_container/flat_set.h"
 #include "flat_container/flat_map.h"
 #include "flat_container/fixed_vector.h"
+#include "flat_container/fixed_string.h"
 #include <set>
 #include <map>
 #include <memory>
+
+#ifdef _WIN32
+#   include <nmmintrin.h>
+#endif
+
+using test::Timer;
 
 testCase(test_flat_set)
 {
@@ -253,4 +260,132 @@ testCase(test_fixed_vector)
             testExpect(data[i] == data4[i]);
         }
     }
+}
+
+
+#ifdef _WIN32
+
+__declspec(noinline)
+bool streq_strcmp(const char* a, const char* b, size_t len)
+{
+    return std::strcmp(a, b) == 0;
+}
+
+__declspec(noinline)
+bool streq_strncmp(const char* a, const char* b, size_t len)
+{
+    return std::strncmp(a, b, len) == 0;
+}
+
+__declspec(noinline)
+bool streq_memcmp(const char* a, const char* b, size_t len)
+{
+    return memcmp(a, b, len) == 0;
+}
+
+// len ÇÕ 8 ÇÃî{êîÇ≈Ç†ÇÈÇ±Ç∆Ç™ëOíÒ
+__declspec(noinline)
+bool streq_uint64(const char* _a, const char* _b, size_t len)
+{
+    auto a = (const uint64_t*)_a;
+    auto b = (const uint64_t*)_b;
+    size_t n = len / 8;
+    for (size_t i = 0; i < n; ++i) {
+        if (*a++ != *b++) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// len ÇÕ 16 ÇÃî{êîÇ≈Ç†ÇÈÇ±Ç∆Ç™ëOíÒ
+__declspec(noinline)
+bool streq_sse42(const char* _a, const char* _b, size_t len)
+{
+    auto a = (const __m128i*)_a;
+    auto b = (const __m128i*)_b;
+    size_t n = len / 16;
+    for (size_t i = 0; i < n; ++i) {
+        int r = _mm_cmpestri(
+            _mm_loadu_si128(a++), 16,
+            _mm_loadu_si128(b++), 16,
+            _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ORDERED);
+        //printf("%d\n", r);
+        if (r != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+#endif
+
+testCase(test_fixed_string)
+{
+#ifdef _WIN32
+    const size_t num = 10000000;
+    //const size_t num = 500000;
+    const size_t len = 128;
+
+    std::vector<std::string> a;
+    std::vector<std::string> b;
+    a.resize(num);
+    b.resize(num);
+    for (size_t i = 0; i < num; ++i) {
+        a[i].resize(len, 0x40 + (i % 0x40));
+        b[i].resize(len, 0x80 - (i % 0x40));
+    }
+
+    printf("loop count: %zu\n", num);
+    printf("string length: %zu\n", len);
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            if (streq_strncmp(a[i].c_str(), b[i].c_str(), len)) {
+                ++r;
+            }
+        }
+        printf("streq_strncmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            if (streq_strcmp(a[i].c_str(), b[i].c_str(), len)) {
+                ++r;
+            }
+        }
+        printf("streq_strcmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            if (streq_memcmp(a[i].c_str(), b[i].c_str(), len)) {
+                ++r;
+            }
+        }
+        printf("streq_memcmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            if (streq_uint64(a[i].c_str(), b[i].c_str(), len)) {
+                ++r;
+            }
+        }
+        printf("streq_uint64(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            if (streq_sse42(a[i].c_str(), b[i].c_str(), len)) {
+                ++r;
+            }
+        }
+        printf("streq_sse42(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+#endif
 }

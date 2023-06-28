@@ -72,52 +72,32 @@ public:
         data_.swap(v);
     }
 
-    // representation
-
     container_type& get() { return data_; }
     const container_type& get() const { return data_; }
-
     container_type&& extract() { return std::move(data_); }
-
-    // compare
 
     bool operator==(const flat_set& v) const { return data_ == v.data_; }
     bool operator!=(const flat_set& v) const { return data_ != v.data_; }
 
-    // resize & clear
 
     void reserve(size_type v) { data_.reserve(v); }
-
     // resize() may break the order. sort() should be called in that case.
     void resize(size_type v) { data_.resize(v); }
-
     void clear() { data_.clear(); }
-
     void shrink_to_fit() { data_.shrink_to_fit(); }
-
-    // for the case m_data is directry modified (resize(), swap(), get(), etc)
+    // for the case data_ is directry modified (resize(), swap(), get(), etc)
     void sort() { std::sort(begin(), end(), key_compare()); }
 
-    // size & data
-
-    size_type empty() const { return data_.empty(); }
-
-    size_type size() const { return data_.size(); }
-
-    pointer data() { return data_.data(); }
-    const_pointer data() const { return data_.data(); }
-
-    // iterator
-
+    size_type empty() const noexcept { return data_.empty(); }
+    size_type size() const noexcept { return data_.size(); }
+    pointer data() noexcept { return data_.data(); }
+    const_pointer data() const noexcept { return data_.data(); }
     iterator begin() noexcept { return data_.begin(); }
     const_iterator begin() const noexcept { return data_.begin(); }
     constexpr const_iterator cbegin() const noexcept { return data_.cbegin(); }
-
     iterator end() noexcept { return data_.end(); }
     const_iterator end() const noexcept { return data_.end(); }
     constexpr const_iterator cend() const noexcept { return data_.cend(); }
-
-    // search
 
     iterator lower_bound(const value_type& v)
     {

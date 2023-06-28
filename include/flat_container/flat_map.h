@@ -73,27 +73,17 @@ public:
         data_.swap(v);
     }
 
-    // representation
-
     container_type& get() { return data_; }
     const container_type& get() const { return data_; }
-
     container_type&& extract() { return std::move(data_); }
 
-    // compare
-
-    bool operator==(const flat_map& v) const { return data_ == v.data_; }
-    bool operator!=(const flat_map& v) const { return data_ != v.data_; }
-
-    // resize & clear
+    bool operator==(const flat_map& v) const noexcept { return data_ == v.data_; }
+    bool operator!=(const flat_map& v) const noexcept { return data_ != v.data_; }
 
     void reserve(size_type v) { data_.reserve(v); }
-
     // resize() may break the order. sort() should be called in that case.
     void resize(size_type v) { data_.resize(v); }
-
     void clear() { data_.clear(); }
-
     void shrink_to_fit() { data_.shrink_to_fit(); }
 
     // for the case m_data is directry modified (resize(), swap(), get(), etc)
@@ -102,36 +92,18 @@ public:
         std::sort(begin(), end(), [](auto& a, auto& b) { return key_compare()(a.first, b.first); });
     }
 
-    // size & data
-
-    size_type empty() const { return data_.empty(); }
-
-    size_type size() const { return data_.size(); }
-
-    pointer data() { return data_.data(); }
-    const_pointer data() const { return data_.data(); }
-
-    // iterator
-
+    size_type empty() const noexcept { return data_.empty(); }
+    size_type size() const noexcept { return data_.size(); }
+    pointer data() noexcept { return data_.data(); }
+    const_pointer data() const noexcept { return data_.data(); }
     iterator begin() noexcept { return data_.begin(); }
     const_iterator begin() const noexcept { return data_.begin(); }
     constexpr const_iterator cbegin() const noexcept { return data_.cbegin(); }
-
     iterator end() noexcept { return data_.end(); }
     const_iterator end() const noexcept { return data_.end(); }
     constexpr const_iterator cend() const noexcept { return data_.cend(); }
 
     // search
-    template<class C = Compare>
-    struct cmp_first
-    {
-        template<class T>
-        bool operator()(const value_type& a, const T& b) const
-        {
-            return C()(a.first, b);
-        }
-    };
-
     iterator lower_bound(const key_type& v)
     {
         return std::lower_bound(begin(), end(), v, cmp_first<>());
@@ -299,6 +271,16 @@ public:
 
 
 private:
+    template<class C = Compare>
+    struct cmp_first
+    {
+        template<class T>
+        bool operator()(const value_type& a, const T& b) const
+        {
+            return C()(a.first, b);
+        }
+    };
+
     static bool equal(const key_type& a, const key_type& b)
     {
         return !Compare()(a, b) && !Compare()(b, a);
