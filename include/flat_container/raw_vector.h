@@ -1,13 +1,16 @@
 #pragma once
-#include "fixed_raw_vector.h"
+#include "foundation.h"
 
 namespace ist {
 
 template<class T, class Memory>
-class basic_fixed_vector : public Memory
+class basic_raw_vector : public Memory
 {
 using super = Memory;
 public:
+    // T must be trivially constructible
+    static_assert(std::is_trivially_constructible_v<T>);
+
     using value_type = T;
     using reference = T&;
     using const_reference = const T&;
@@ -16,33 +19,31 @@ public:
     using iterator = pointer;
     using const_iterator = const_pointer;
 
-    constexpr basic_fixed_vector() {}
-    constexpr basic_fixed_vector(basic_fixed_vector&& r) noexcept { operator=(std::move(r)); }
+    constexpr basic_raw_vector() {}
+    constexpr basic_raw_vector(const basic_raw_vector& r) { operator=(r); }
+    constexpr basic_raw_vector(basic_raw_vector&& r) noexcept { operator=(std::move(r)); }
 
-    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
-    constexpr basic_fixed_vector(const basic_fixed_vector& r) noexcept { operator=(r); }
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    constexpr explicit basic_raw_vector(size_t n) { resize(n); }
 
-    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
-    constexpr explicit basic_fixed_vector(size_t n) { resize(n); }
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    constexpr basic_raw_vector(size_t n, const T& v) { resize(n, v); }
 
-    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
-    constexpr basic_fixed_vector(size_t n, const T& v) { resize(n, v); }
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    constexpr basic_raw_vector(std::initializer_list<T> r) { assign(r); }
 
-    template<bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
-    constexpr basic_fixed_vector(std::initializer_list<T> r) { assign(r); }
+    template<class Iter, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_iterator_v<Iter>)>
+    constexpr basic_raw_vector(Iter first, Iter last) { assign(first, last); }
 
-    template<class ForwardIter, bool view = is_memory_view_v<super>, std::enable_if_t<!view, bool> = true>
-    constexpr basic_fixed_vector(ForwardIter first, ForwardIter last) { assign(first, last); }
-
-    template<bool view = is_memory_view_v<super>, std::enable_if_t<view, bool> = true>
-    constexpr basic_fixed_vector(void* data, size_t capacity, size_t size = 0)
+    template<bool view = is_memory_view_v<super>, fc_require(view)>
+    constexpr basic_raw_vector(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
     }
 
-    ~basic_fixed_vector() { clear(); }
+    ~basic_raw_vector() { clear(); }
 
-    constexpr void swap(basic_fixed_vector& r)
+    constexpr void swap(basic_raw_vector& r)
     {
         if constexpr (is_trivially_swappable_v<super>) {
             std::swap(capacity_, r.capacity_);
@@ -50,46 +51,33 @@ public:
             std::swap(data_, r.data_);
         }
         else {
-            size_t size1 = size_;
-            size_t size2 = r.size_;
-            size_t swap_count = std::min(size1, size2);
+            size_t swap_count = std::min(size_, r.size_);
             for (size_t i = 0; i < swap_count; ++i) {
                 std::swap(data_[i], r[i]);
-            }
-            if (size1 < size2) {
-                for (size_t i = size1; i < size2; ++i) {
-                    new (data_ + i) T(std::move(r[i]));
-                    r[i].~T();
-                }
-            }
-            if (size2 < size1) {
-                for (size_t i = size2; i < size1; ++i) {
-                    new (r.data_ + i) T(std::move(data_[i]));
-                    data_[i].~T();
-                }
             }
             std::swap(size_, r.size_);
         }
     }
 
-    constexpr basic_fixed_vector& operator=(const basic_fixed_vector& r) noexcept
+    constexpr basic_raw_vector& operator=(const basic_raw_vector& r)
     {
-        if constexpr (!is_memory_view_v<super>) {
-            assign(r.begin(), r.end());
+        if constexpr (is_memory_view_v<super>) {
+            capacity_ = r.capacity_;
+            size_ = r.size_;
+            data_ = r.data_;
         }
         else {
-            // forbid copy if memory view
-            static_assert(!is_memory_view_v<super>);
+            assign(r.begin(), r.end());
         }
         return *this;
     }
-    constexpr basic_fixed_vector& operator=(basic_fixed_vector&& r) noexcept
+    constexpr basic_raw_vector& operator=(basic_raw_vector&& r) noexcept
     {
         if constexpr (is_trivially_swappable_v<super>) {
             swap(r);
         }
         else {
-            assign_impl(r.size(), [&](T* dst) { move_construct(dst, r.begin(), r.end()); });
+            assign_impl(r.size(), [&](T* dst) { copy_construct(dst, r.begin(), r.end()); });
             r.clear();
         }
         return *this;
@@ -98,6 +86,8 @@ public:
     using super::capacity;
     using super::size;
     using super::data;
+    using super::reserve;
+    using super::shrink_to_fit;
 
     constexpr bool empty() const noexcept { return size_ > 0; }
     constexpr bool full() const noexcept { return size_ == capacity_; }
@@ -116,10 +106,6 @@ public:
     constexpr T& back() { boundary_check(1); return data_[size_ - 1]; }
     constexpr const T& back() const { boundary_check(1); return data_[size_ - 1]; }
 
-    // just for compatibility
-    constexpr void reserve(size_t n) noexcept {}
-    constexpr void shrink_to_fit() noexcept {}
-
     constexpr void clear()
     {
         shrink(size_);
@@ -127,26 +113,22 @@ public:
 
     constexpr void resize(size_t n)
     {
-        resize_impl(n, [&](T* addr) { new (addr) T(); });
+        resize_impl(n, [&](T*, size_t) {});
     }
     constexpr void resize(size_t n, const T& v)
     {
-        resize_impl(n, [&](T* addr) { new (addr) T(v); });
+        resize_impl(n, [&](T* addr, size_t c) { copy_construct(addr, v, c); });
     }
 
     constexpr void push_back(const T& v)
     {
-        expand(1, [&](T* addr) { new (addr) T(v); });
-    }
-    constexpr void push_back(T&& v)
-    {
-        expand(1, [&](T* addr) { new (addr) T(std::move(v)); });
+        expand(1, [&](T* addr, size_t) { *addr = v; });
     }
 
     template< class... Args >
     constexpr T& emplace_back(Args&&... args)
     {
-        expand(1, [&](T* addr) { new (addr) T(std::forward<Args>(args)...); });
+        expand(1, [&](T* addr, size_t) { *addr = T(std::forward<Args>(args)...); });
         return back();
     }
 
@@ -155,8 +137,8 @@ public:
         shrink(1);
     }
 
-    template<class ForwardIter>
-    constexpr void assign(ForwardIter first, ForwardIter last)
+    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    constexpr void assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
         assign_impl(n, [&](T* dst) { copy_construct(dst, first, last); });
@@ -167,22 +149,18 @@ public:
     }
     constexpr void assign(size_t n, const T& v)
     {
-        assign_impl(n, [&](T* dst) { copy_construct(dst, v); });
+        assign_impl(n, [&](T* dst) { copy_construct(dst, v, n); });
     }
 
-    template<class ForwardIter>
-    constexpr iterator insert(iterator pos, ForwardIter first, ForwardIter last)
+    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
         return insert_impl(pos, n, [&](T* addr) { copy_construct(addr, first, last); });
     }
     constexpr iterator insert(iterator pos, const T& v)
     {
-        return insert_impl(pos, 1, [&](T* addr) { copy_construct(addr, v); });
-    }
-    constexpr iterator insert(iterator pos, T&& v)
-    {
-        return insert_impl(pos, 1, [&](T* addr) { move_construct(addr, std::move(v)); });
+        return insert_impl(pos, 1, [&](T* addr) { copy_construct(addr, v, 1); });
     }
     constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
@@ -191,9 +169,8 @@ public:
 
     constexpr iterator erase(iterator first, iterator last)
     {
-        size_t s = std::distance(first, last);
-        std::move(last, end(), first);
-        shrink(s);
+        copy(first, last, std::distance(last, end()));
+        shrink(std::distance(first, last));
         return first;
     }
     constexpr iterator erase(iterator pos)
@@ -206,63 +183,34 @@ private:
     using super::size_;
     using super::data_;
 
-    constexpr void copy_construct(iterator pos, const T& v)
+    template<class Iter, fc_require(std::is_pointer_v<Iter>)>
+    static void copy(iterator dst, Iter src, size_t n)
     {
-        if (pos >= data_ + size_) {
-            new (pos) T(v);
-        }
-        else {
-            *pos = v;
-        }
+        std::memcpy(dst, src, sizeof(T) * n);
     }
-    template<class ForwardIter>
-    constexpr void copy_construct(iterator dst, ForwardIter first, ForwardIter last)
+    template<class Iter, fc_require(!std::is_pointer_v<Iter>)>
+    static void copy(iterator dst, Iter src, size_t n)
     {
-        size_t n = std::distance(first, last);
-        T* end_assign = std::min(dst + n, data_ + size_);
-        T* end_new = dst + n;
-        while (dst < end_assign) {
-            *dst++ = *first++;
-        }
-        while (dst < end_new) {
-            new (dst++) T(*first++);
-        }
+        std::copy(src, src + n, dst);
     }
 
-    constexpr void move_construct(iterator pos, T&& v)
+    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    constexpr void copy_construct(iterator dst, Iter first, Iter last)
     {
-        if (pos >= data_ + size_) {
-            new (pos) T(std::move(v));
-        }
-        else {
-            *pos = std::move(v);
-        }
+       copy(dst, first, std::distance(first, last));
     }
-    template<class ForwardIter>
-    constexpr void move_construct(iterator dst, ForwardIter first, ForwardIter last)
+    constexpr void copy_construct(iterator pos, const T& v, size_t n)
     {
-        size_t n = std::distance(first, last);
-        T* end_assign = std::min(dst + n, data_ + size_);
-        T* end_new = dst + n;
-        while (dst < end_assign) {
-            *dst++ = std::move(*first++);
-        }
-        while (dst < end_new) {
-            new (dst++) T(std::move(*first++));
-        }
+        auto first = make_constant_iterator(v);
+        copy_construct(pos, first, first + n);
     }
 
     template<class Construct>
     constexpr void assign_impl(size_t n, Construct&& construct)
     {
+        reserve(n);
         capacity_check(n);
-        T* dst = data_;
-        T* end_dtor = data_ + size_;
-        construct(dst);
-        dst += n;
-        while (dst < end_dtor) {
-            (dst++)->~T();
-        }
+        construct(data_);
         size_ = n;
     }
 
@@ -270,9 +218,6 @@ private:
     {
         size_t new_size = size_ - n;
         capacity_check(new_size);
-        for (size_t i = new_size; i < size_; ++i) {
-            data_[i].~T();
-        }
         size_ = new_size;
     }
 
@@ -280,10 +225,9 @@ private:
     constexpr void expand(size_t n, Construct&& construct)
     {
         size_t new_size = size_ + n;
+        reserve(new_size);
         capacity_check(new_size);
-        for (size_t i = size_; i < new_size; ++i) {
-            construct(data_ + i);
-        }
+        construct(data_ + size_, n);
         size_ = new_size;
     }
 
@@ -301,6 +245,9 @@ private:
     template<class Construct>
     constexpr iterator insert_impl(iterator pos, size_t s, Construct&& construct)
     {
+        size_t d = std::distance(data_, pos);
+        reserve(size_ + s);
+        pos = data_ + d; // for the case realloc happened
         move_backward(pos, data_ + size_, data_ + size_ + s);
         construct(pos);
         size_ += s;
@@ -313,11 +260,8 @@ private:
         if (n == 0) {
             return dst;
         }
-        T* end_new = data_ + size_;
         T* end_assign = dst - n;
-        while (dst > end_new) {
-            new (--dst) T(std::move(*(--last)));
-        }
+        // we cannot use memcpy() because the ranges may overlap
         while (dst > end_assign) {
             *(--dst) = std::move(*(--last));
         }
@@ -343,10 +287,13 @@ private:
 };
 
 
+template<class T>
+using raw_vector = basic_raw_vector<T, dynamic_memory<T>>;
+
 template<class T, size_t Capacity>
-using fixed_vector = basic_fixed_vector<T, fixed_memory<T, Capacity>>;
+using fixed_raw_vector = basic_raw_vector<T, fixed_memory<T, Capacity>>;
 
 template<class T>
-using vector_view = basic_fixed_vector<T, memory_view<T>>;
+using raw_vector_view = basic_raw_vector<T, memory_view<T>>;
 
 } // namespace ist

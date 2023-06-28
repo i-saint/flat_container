@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="ist::basic_fixed_vector&lt;*&gt;">
+  <Type Name="ist::basic_raw_vector&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">size_</Item>
+      <Item Name="[capacity]">capacity_</Item>
+      <ArrayItems>
+        <Size>size_</Size>
+        <ValuePointer>data_</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="ist::basic_vector&lt;*&gt;">
     <DisplayString>{{ size={size_} }}</DisplayString>
     <Expand>
       <Item Name="[size]">size_</Item>

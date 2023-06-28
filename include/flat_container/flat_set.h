@@ -2,7 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <initializer_list>
-#include "fixed_vector.h"
+#include "vector.h"
 
 namespace ist {
 
@@ -33,19 +33,21 @@ public:
     flat_set() {}
     flat_set(const flat_set& v) { operator=(v); }
     flat_set(flat_set&& v) noexcept { operator=(std::move(v)); }
+    flat_set(const container_type& v) { operator=(v); }
+    flat_set(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool view = is_memory_view_v<container_type>, std::enable_if_t<!view, bool> = true>
+    template <class Iter, bool view = is_memory_view_v<container_type>, fc_require(!view), fc_require(is_iterator_v<Iter>)>
     flat_set(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool view = is_memory_view_v<container_type>, std::enable_if_t<!view, bool> = true>
+    template <bool view = is_memory_view_v<container_type>, fc_require(!view)>
     flat_set(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool view = is_memory_view_v<container_type>, std::enable_if_t<view, bool> = true>
+    template<bool view = is_memory_view_v<container_type>, fc_require(view)>
     flat_set(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -61,18 +63,28 @@ public:
         swap(v);
         return *this;
     }
+    flat_set& operator=(const container_type& v)
+    {
+        data_ = v.data_;
+        sort();
+        return *this;
+    }
+    flat_set& operator=(container_type&& v) noexcept
+    {
+        swap(v);
+        return *this;
+    }
 
     void swap(flat_set& v) noexcept
     {
         data_.swap(v.data_);
     }
-    // v must be sorted or call sort() after swap()
     void swap(container_type& v) noexcept
     {
         data_.swap(v);
+        sort();
     }
 
-    container_type& get() { return data_; }
     const container_type& get() const { return data_; }
     container_type&& extract() { return std::move(data_); }
 
@@ -81,12 +93,8 @@ public:
 
 
     void reserve(size_type v) { data_.reserve(v); }
-    // resize() may break the order. sort() should be called in that case.
-    void resize(size_type v) { data_.resize(v); }
     void clear() { data_.clear(); }
     void shrink_to_fit() { data_.shrink_to_fit(); }
-    // for the case data_ is directry modified (resize(), swap(), get(), etc)
-    void sort() { std::sort(begin(), end(), key_compare()); }
 
     size_type empty() const noexcept { return data_.empty(); }
     size_type size() const noexcept { return data_.size(); }
@@ -194,24 +202,29 @@ public:
     std::pair<iterator, bool> insert(const value_type& v)
     {
         auto it = lower_bound(v);
-        if (it == end() || !equal(*it, v))
+        if (it == end() || !equal(*it, v)) {
             return { data_.insert(it, v), true };
-        else
+        }
+        else {
             return { it, false };
+        }
     }
     std::pair<iterator, bool> insert(value_type&& v)
     {
         auto it = lower_bound(v);
-        if (it == end() || !equal(*it, v))
+        if (it == end() || !equal(*it, v)) {
             return { data_.insert(it, v), true };
-        else
+        }
+        else {
             return { it, false };
+        }
     }
-    template <class Iter>
+    template<class Iter, fc_require(is_iterator_v<Iter>)>
     void insert(Iter first, Iter last)
     {
-        for (auto i = first; i != last; ++i)
+        for (auto i = first; i != last; ++i) {
             insert(*i);
+        }
     }
     void insert(std::initializer_list<value_type> list)
     {
@@ -220,10 +233,12 @@ public:
 
     iterator erase(const value_type& v)
     {
-        if (auto it = find(v); it != end())
+        if (auto it = find(v); it != end()) {
             return data_.erase(it);
-        else
+        }
+        else {
             return end();
+        }
     }
     iterator erase(iterator pos)
     {
@@ -235,6 +250,8 @@ public:
     }
 
 private:
+    void sort() { std::sort(begin(), end(), key_compare()); }
+
     static bool equal(const value_type& a, const value_type& b)
     {
         return !Compare()(a, b) && !Compare()(b, a);

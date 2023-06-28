@@ -1,8 +1,9 @@
 #include "Test.h"
 #include "flat_container/flat_set.h"
 #include "flat_container/flat_map.h"
-#include "flat_container/fixed_vector.h"
-#include "flat_container/fixed_string.h"
+#include "flat_container/raw_vector.h"
+#include "flat_container/vector.h"
+#include "flat_container/string.h"
 #include <set>
 #include <map>
 #include <memory>
@@ -167,32 +168,41 @@ testCase(test_fixed_vector)
     {
         // basic tests
         ist::fixed_vector<std::string, 128> data, data2, data3;
+        ist::vector<std::string> ddata;
 
-        std::byte buf1[sizeof(std::string) * 128];
-        std::byte buf2[sizeof(std::string) * 128];
-        ist::vector_view<std::string> view(buf1, 128), view2(buf2, 128);
+        std::byte buf[sizeof(std::string) * 128];
+        ist::vector_view<std::string> vdata(buf, 128);
 
-        std::string tmp;
-        for (int i = 0; i < 64; ++i) {
-            tmp += ' ' + char(i);
+        auto make_data = [](auto& dst) {
+            std::string tmp;
+            for (int i = 0; i < 64; ++i) {
+                tmp += ' ' + char(i);
 
-            switch (i % 7) {
-            case 0: data.push_back(tmp); break;
-            case 1: {
-                auto t = tmp;
-                data.push_back(std::move(t));
-                break;
+                switch (i % 8) {
+                case 0: dst.push_back(tmp); break;
+                case 1: {
+                    auto t = tmp;
+                    dst.push_back(std::move(t));
+                    break;
+                }
+                case 2: dst.emplace_back(tmp); break;
+                case 3: dst.resize(dst.size() + 1, tmp); break;
+                case 4: dst.insert(dst.begin(), tmp); break;
+                case 5: dst.insert(dst.begin(), &tmp, &tmp + 1); break;
+                case 6: dst.insert(dst.begin(), std::initializer_list<std::string>{tmp}); break;
+                case 7: dst.erase(dst.begin() + dst.size() / 2); break;
+                }
             }
-            case 2: data.emplace_back(tmp); break;
-            case 3: data.resize(data.size() + 1, tmp); break;
-            case 4: data.insert(data.begin(), tmp); break;
-            case 5: data.insert(data.begin(), &tmp, &tmp + 1); break;
-            case 6: data.insert(data.begin(), std::initializer_list<std::string>{tmp}); break;
-            }
-        }
+        };
+        make_data(data);
+        make_data(ddata);
+        make_data(vdata);
+
+        testExpect(std::equal(data.begin(), data.end(), ddata.begin()));
+        testExpect(std::equal(data.begin(), data.end(), vdata.begin()));
 
         data.erase(data.begin() + 32, data.begin() + 40);
-        testExpect(data.size() == 56);
+        testExpect(data.size() == 40);
 
         data2 = data;
         for (size_t i = 0; i < data.size(); ++i) {
@@ -204,7 +214,15 @@ testCase(test_fixed_vector)
             testExpect(data[i] == data3[i]);
         }
 
-        //view = view2;
+        data2.assign(data3.begin(), data3.end());
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data2[i] == data3[i]);
+        }
+
+        data3.assign(64, data2[0]);
+        for (auto& v : data3) {
+            testExpect(v == data2[0]);
+        }
     }
 
     {
@@ -258,6 +276,93 @@ testCase(test_fixed_vector)
         testExpect(data3.size() == 2);
         for (size_t i = 0; i < data.size(); ++i) {
             testExpect(data[i] == data4[i]);
+        }
+    }
+}
+
+testCase(test_fixed_raw_vector)
+{
+    // causes static assertion failure
+    //ist::fixed_raw_vector<std::string, 128> hoge;
+
+    {
+        // basic tests
+        ist::fixed_raw_vector<int, 128> data, data2, data3;
+        ist::raw_vector<int> ddata;
+
+        std::byte buf1[sizeof(int) * 128];
+        ist::raw_vector_view<int> vdata(buf1, 128);
+
+        auto make_data = [](auto& dst){
+            int tmp = 0;
+            for (int i = 0; i < 64; ++i) {
+                tmp += i;
+
+                switch (i % 8) {
+                case 0: dst.push_back(tmp); break;
+                case 1: {
+                    auto t = tmp;
+                    dst.push_back(std::move(t));
+                    break;
+                }
+                case 2: dst.emplace_back(tmp); break;
+                case 3: dst.resize(dst.size() + 1, tmp); break;
+                case 4: dst.insert(dst.begin(), tmp); break;
+                case 5: dst.insert(dst.begin(), &tmp, &tmp + 1); break;
+                case 6: dst.insert(dst.begin(), std::initializer_list<int>{tmp}); break;
+                case 7: dst.erase(dst.begin() + dst.size() / 2); break;
+                }
+            }
+        };
+        make_data(data);
+        make_data(ddata);
+        make_data(vdata);
+
+        testExpect(std::equal(data.begin(), data.end(), ddata.begin()));
+        testExpect(std::equal(data.begin(), data.end(), vdata.begin()));
+
+        data.erase(data.begin() + 32, data.begin() + 40);
+        testExpect(data.size() == 40);
+
+        data2 = data;
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data2[i]);
+        }
+
+        data3 = std::move(data2);
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data[i] == data3[i]);
+        }
+
+        data2.assign(data3.begin(), data3.end());
+        for (size_t i = 0; i < data.size(); ++i) {
+            testExpect(data2[i] == data3[i]);
+        }
+
+        data3.assign(64, data2[0]);
+        for (auto& v : data3) {
+            testExpect(v == data2[0]);
+        }
+
+        //view = view2;
+    }
+
+}
+
+
+testCase(test_constant_iterator)
+{
+    {
+        using value_t = std::iterator_traits<ist::constant_iterator<std::string>>::value_type;
+        printf("%d\n", std::is_same_v<value_t, std::string> ? 1 : 0);
+
+        std::string data = "abcdefg";
+
+        auto first = ist::make_constant_iterator(data);
+        auto last = first + 4;
+
+        for (; first != last; ++first) {
+            printf("%s\n", first->c_str());
         }
     }
 }
@@ -322,7 +427,7 @@ bool streq_sse42(const char* _a, const char* _b, size_t len)
 testCase(test_fixed_string)
 {
 #ifdef _WIN32
-    const size_t num = 10000000;
+    const size_t num = 1000000;
     //const size_t num = 500000;
     const size_t len = 128;
 
