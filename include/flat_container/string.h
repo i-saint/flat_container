@@ -6,7 +6,7 @@
 namespace ist {
 
 template<class T, class Memory, class Traits = std::char_traits<T>>
-class basic_fixed_string : public Memory
+class basic_string : public Memory
 {
 using super = Memory;
 public:
@@ -20,52 +20,55 @@ public:
 
     using super::capacity;
     using super::size;
+    using super::size_bytes;
     using super::data;
     using super::reserve;
     using super::shrink_to_fit;
+    using super::clear;
 
-    constexpr bool empty() const noexcept { return size_ > 0; }
-    constexpr bool full() const noexcept { return size_ == capacity_; }
-    constexpr iterator begin() noexcept { return data_; }
-    constexpr const_iterator begin() const noexcept { return data_; }
-    constexpr const_iterator cbegin() const noexcept { return data_; }
-    constexpr iterator end() noexcept { return data_ + size_; }
-    constexpr const_iterator end() const noexcept { return data_ + size_; }
-    constexpr const_iterator cend() const noexcept { return data_ + size_; }
-    constexpr T& at(size_t i) { boundary_check(i); return data_[i]; }
-    constexpr const T& at(size_t i) const { boundary_check(i); return data_[i]; }
-    constexpr T& operator[](size_t i) { boundary_check(i); return data_[i]; }
-    constexpr const T& operator[](size_t i) const { boundary_check(i); return data_[i]; }
-    constexpr T& front() { boundary_check(1); return data_[0]; }
-    constexpr const T& front() const { boundary_check(1); return data_[0]; }
-    constexpr T& back() { boundary_check(1); return data_[size_ - 1]; }
-    constexpr const T& back() const { boundary_check(1); return data_[size_ - 1]; }
-
-    // just for compatibility
-    constexpr void reserve(size_t n) noexcept {}
-    constexpr void shrink_to_fit() noexcept {}
+    using super::empty;
+    using super::full;
+    using super::begin;
+    using super::cbegin;
+    using super::end;
+    using super::cend;
+    using super::at;
+    using super::operator[];
+    using super::front;
+    using super::back;
 
 private:
-    using super::capacity_;
-    using super::size_;
-    using super::data_;
-
-    constexpr void capacity_check(size_t n) const
-    {
-#ifdef FC_ENABLE_CAPACITY_CHECK
-        if (n > capacity_) {
-            throw std::out_of_range("fixed_vector: out of capacity");
-        }
-#endif
-    }
-    constexpr void boundary_check(size_t n) const
-    {
-#ifdef FC_ENABLE_CAPACITY_CHECK
-        if (n > size_) {
-            throw std::out_of_range("fixed_vector: out of range");
-        }
-#endif
-    }
 };
+
+template<class T, class M1, class M2, class Tr>
+bool operator==(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin());
+}
+template<class T, class M1, class M2, class Tr>
+bool operator!=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin());
+}
+template<class T, class M1, class M2, class Tr>
+bool operator<(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
+}
+template<class T, class M1, class M2, class Tr>
+bool operator>(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return r < l;
+}
+template<class T, class M1, class M2, class Tr>
+bool operator<=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return !(r < l);
+}
+template<class T, class M1, class M2, class Tr>
+bool operator>=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return !(l < r);
+}
 
 } // namespace ist

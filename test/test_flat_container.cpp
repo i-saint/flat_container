@@ -19,6 +19,7 @@ testCase(test_flat_set)
     std::set<std::string> sset;
     ist::flat_set<std::string> fset;
     ist::fixed_set<std::string, 32> xset;
+    ist::sbo_set<std::string, 8> bset;
 
     std::byte buf[sizeof(std::string) * 32];
     ist::set_view<std::string> vset(buf, 32);
@@ -26,54 +27,49 @@ testCase(test_flat_set)
     auto check = [&]() {
         testExpect(sset.size() == fset.size());
         testExpect(sset.size() == xset.size());
+        testExpect(sset.size() == bset.size());
         testExpect(sset.size() == vset.size());
 
         auto i1 = sset.begin();
         auto i2 = fset.begin();
         auto i3 = xset.begin();
-        auto i4 = vset.begin();
+        auto i4 = bset.begin();
+        auto i5 = vset.begin();
         while (i1 != sset.end()) {
             testExpect(*i1 == *i2);
             testExpect(*i1 == *i3);
             testExpect(*i1 == *i4);
-            ++i1; ++i2; ++i3; ++i4;
+            testExpect(*i1 == *i5);
+            ++i1; ++i2; ++i3; ++i4; ++i5;
         }
     };
     auto insert = [&](const std::string& v) {
         sset.insert(v);
         fset.insert(v);
         xset.insert(v);
+        bset.insert(v);
         vset.insert(v);
     };
     auto insert_il = [&](std::initializer_list<std::string>&& v) {
         sset.insert(v);
         fset.insert(v);
         xset.insert(v);
+        bset.insert(v);
         vset.insert(v);
     };
     auto erase = [&](const std::string& v) {
         sset.erase(v);
         fset.erase(v);
         xset.erase(v);
+        bset.erase(v);
         vset.erase(v);
     };
 
-    std::string data[]{
-        "e",
-        "a",
-        "e",
-        "b",
-        "c",
-        "d",
-        "c",
-        "b",
-        "d",
-        "a",
-    };
+    std::string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", };
     for (auto& v : data) {
         insert(v);
     }
-    insert_il({ "abc", "def" });
+    insert_il({ "abc", "def", "ghi", "jkl" });
     check();
 
     testExpect(fset == xset);
@@ -82,6 +78,13 @@ testCase(test_flat_set)
     testExpect(!(fset > xset));
     testExpect(fset <= xset);
     testExpect(fset >= xset);
+
+    testExpect(fset == bset);
+    testExpect(!(fset != bset));
+    testExpect(!(fset < bset));
+    testExpect(!(fset > bset));
+    testExpect(fset <= bset);
+    testExpect(fset >= bset);
 
     erase("c");
     erase("a");
@@ -95,6 +98,7 @@ testCase(test_flat_map)
     std::map<std::string, int> smap;
     ist::flat_map<std::string, int> fmap;
     ist::fixed_map<std::string, int, 32> xmap;
+    ist::sbo_map<std::string, int, 8> bmap;
 
     std::byte buf[sizeof(std::pair<std::string, int>) * 32];
     ist::map_view<std::string, int> vmap(buf, 32);
@@ -102,35 +106,41 @@ testCase(test_flat_map)
     auto check = [&]() {
         testExpect(smap.size() == fmap.size());
         testExpect(smap.size() == xmap.size());
+        testExpect(smap.size() == bmap.size());
         testExpect(smap.size() == vmap.size());
 
         auto i1 = smap.begin();
         auto i2 = fmap.begin();
         auto i3 = xmap.begin();
-        auto i4 = vmap.begin();
+        auto i4 = bmap.begin();
+        auto i5 = vmap.begin();
         while (i1 != smap.end()) {
             testExpect(i1->first == i2->first); testExpect(i1->second == i2->second);
             testExpect(i1->first == i3->first); testExpect(i1->second == i3->second);
             testExpect(i1->first == i4->first); testExpect(i1->second == i4->second);
-            ++i1; ++i2; ++i3; ++i4;
+            testExpect(i1->first == i5->first); testExpect(i1->second == i5->second);
+            ++i1; ++i2; ++i3; ++i4; ++i5;
         }
     };
     auto insert = [&](const std::pair<std::string, int>& v) {
         smap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
+        bmap.insert(v);
         vmap.insert(v);
     };
     auto insert_il = [&](std::initializer_list<std::pair<const std::string, int>>&& v) {
         smap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
+        bmap.insert(v);
         vmap.insert(v);
     };
     auto erase = [&](const std::string& v) {
         smap.erase(v);
         fmap.erase(v);
         xmap.erase(v);
+        bmap.erase(v);
         vmap.erase(v);
     };
 
@@ -150,7 +160,7 @@ testCase(test_flat_map)
     for (auto& v : data) {
         insert(v);
     }
-    insert_il({ {"abc", 1000}, {"def", 500} });
+    insert_il({ {"abc", 100}, {"def", 200}, {"ghi", 300}, {"jkl", 400} });
     check();
 
     testExpect(fmap == xmap);
@@ -159,6 +169,13 @@ testCase(test_flat_map)
     testExpect(!(fmap > xmap));
     testExpect(fmap <= xmap);
     testExpect(fmap >= xmap);
+
+    testExpect(fmap == bmap);
+    testExpect(!(fmap != bmap));
+    testExpect(!(fmap < bmap));
+    testExpect(!(fmap > bmap));
+    testExpect(fmap <= bmap);
+    testExpect(fmap >= bmap);
 
     erase("c");
     erase("a");
@@ -174,14 +191,10 @@ testCase(test_fixed_vector)
     printf("is_memory_view_v<ist::vector_view<int>>: %d\n",
         (int)ist::is_memory_view_v<ist::vector_view<int>>);
 
-    printf("is_trivially_swappable_v<ist::fixed_vector<int, 8>>: %d\n",
-        (int)ist::is_trivially_swappable_v<ist::fixed_vector<int, 8>>);
-    printf("is_trivially_swappable_v<ist::vector_view<int>>: %d\n",
-        (int)ist::is_trivially_swappable_v<ist::vector_view<int>>);
-
     {
         // basic tests
         ist::fixed_vector<std::string, 128> data, data2, data3;
+        ist::sbo_vector<std::string, 32> sdata;
         ist::vector<std::string> ddata;
 
         std::byte buf[sizeof(std::string) * 128];
@@ -210,8 +223,16 @@ testCase(test_fixed_vector)
             }
         };
         make_data(data);
+        make_data(sdata);
         make_data(ddata);
         make_data(vdata);
+
+        testExpect(data == sdata);
+        testExpect(!(data != sdata));
+        testExpect(!(data < sdata));
+        testExpect(!(data > sdata));
+        testExpect(data <= sdata);
+        testExpect(data >= sdata);
 
         testExpect(data == ddata);
         testExpect(!(data != ddata));
@@ -299,7 +320,7 @@ testCase(test_fixed_vector)
         }
 
         data4.push_back(elem("abc"));
-        data4.push_back(elem("def"));
+        data4.emplace_back("def");
         std::swap(data4, data3);
         testExpect(data3.size() == 2);
         for (size_t i = 0; i < data.size(); ++i) {
@@ -316,6 +337,7 @@ testCase(test_fixed_raw_vector)
     {
         // basic tests
         ist::fixed_raw_vector<int, 128> data, data2, data3;
+        ist::sbo_raw_vector<int, 32> sdata;
         ist::raw_vector<int> ddata;
 
         std::byte buf1[sizeof(int) * 128];
@@ -344,8 +366,16 @@ testCase(test_fixed_raw_vector)
             }
         };
         make_data(data);
+        make_data(sdata);
         make_data(ddata);
         make_data(vdata);
+
+        testExpect(data == sdata);
+        testExpect(!(data != sdata));
+        testExpect(!(data < sdata));
+        testExpect(!(data > sdata));
+        testExpect(data <= sdata);
+        testExpect(data >= sdata);
 
         testExpect(data == ddata);
         testExpect(!(data != ddata));

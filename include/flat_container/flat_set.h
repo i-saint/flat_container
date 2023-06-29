@@ -298,17 +298,13 @@ bool operator>=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2
 }
 
 
-template <
-    class Key,
-    size_t Capacity,
-    class Compare = std::less<>
->
+template <class Key, size_t Capacity, class Compare = std::less<>>
 using fixed_set = flat_set<Key, Compare, fixed_vector<Key, Capacity>>;
 
-template <
-    class Key,
-    class Compare = std::less<>
->
+template <class Key, size_t Capacity, class Compare = std::less<>>
+using sbo_set = flat_set<Key, Compare, sbo_vector<Key, Capacity>>;
+
+template <class Key, class Compare = std::less<>>
 using set_view = flat_set<Key, Compare, vector_view<Key>>;
 
 } // namespace ist

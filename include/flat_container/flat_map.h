@@ -351,19 +351,13 @@ bool operator>=(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp,
 }
 
 
-template <
-    class Key,
-    class Value,
-    size_t Capacity,
-    class Compare = std::less<>
->
+template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
 using fixed_map = flat_map<Key, Value, Compare, fixed_vector<std::pair<Key, Value>, Capacity>>;
 
-template <
-    class Key,
-    class Value,
-    class Compare = std::less<>
->
+template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
+using sbo_map = flat_map<Key, Value, Compare, sbo_vector<std::pair<Key, Value>, Capacity>>;
+
+template <class Key, class Value, class Compare = std::less<>>
 using map_view = flat_map<Key, Value, Compare, vector_view<std::pair<Key, Value>>>;
 
 } // namespace ist
