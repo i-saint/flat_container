@@ -575,6 +575,13 @@ public:
     constexpr void reserve(size_t n) {}
     constexpr void shrink_to_fit() {}
 
+    // detach data from this view.
+    // (if detach() or swap() are not called, elements are destroyed by ~memory_view())
+    constexpr void detach()
+    {
+        *this = {};
+    }
+
 protected:
     size_t capacity_ = 0;
     size_t size_ = 0;
