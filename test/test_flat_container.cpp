@@ -509,6 +509,27 @@ testCase(test_fixed_string)
         std::unordered_map<ist::string, int> hoge{{"a", 999}};
         printf("std::unordered_map<ist::string, int>: %d\n", hoge["a"]);
     }
+    {
+        ist::fixed_string<32> abc = "12345";
+        ist::fixed_string<32> def = "67890";
+
+#define cmp(exp) printf(#exp ": %d\n", (int)(exp))
+        cmp(abc == def);
+        cmp(abc != def);
+        cmp(abc < def);
+        cmp(abc <= def);
+        cmp(abc > def);
+        cmp(abc >= def);
+#undef cmp
+
+        abc += '?';
+        abc += "hoge";
+        abc += {'a', 'b', 'c'};
+        abc += std::string_view("def");
+
+        auto pos = abc.find("345");
+        testExpect(abc[pos] == '3');
+    }
 
 
 #ifdef _WIN32

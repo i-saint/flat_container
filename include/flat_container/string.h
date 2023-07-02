@@ -20,6 +20,8 @@ using super = Memory;
 public:
     using traits_type = Traits;
 
+    static const size_t npos = ~0;
+
     constexpr basic_string() = default;
     constexpr basic_string(const basic_string& r) = default;
     constexpr basic_string(basic_string&& r) noexcept = default;
@@ -62,25 +64,30 @@ public:
     using super::front;
     using super::back;
 
+    constexpr const T* c_str() const { return data(); }
     constexpr size_t length() const { return size(); }
 
     constexpr void resize(size_t n)
     {
         _resize(n, [&](T*) {}); // new elements are uninitialized
+        _null_terminate();
     }
     constexpr void resize(size_t n, T v)
     {
         _resize(n, [&](T* addr) { *addr = v; });
+        _null_terminate();
     }
 
     constexpr void push_back(const T& v)
     {
         _expand(1, [&](T* addr) { *addr = v; });
+        _null_terminate();
     }
 
     constexpr void pop_back()
     {
         _shrink(1);
+        _null_terminate();
     }
 
     template<class Iter, fc_require(is_iterator_v<Iter>)>
@@ -88,35 +95,45 @@ public:
     {
         size_t n = std::distance(first, last);
         _assign(n, [&](T* dst) { _copy_range(dst, first, last); });
+        _null_terminate();
     }
     constexpr void assign(std::initializer_list<T> list)
     {
         _assign(list.size(), [&](T* dst) { _copy_range(dst, list.begin(), list.end()); });
+        _null_terminate();
     }
     constexpr void assign(size_t n, const T& v)
     {
         _assign(n, [&](T* dst) { _copy_n(dst, v, n); });
+        _null_terminate();
     }
 
     template<class Iter, fc_require(is_iterator_v<Iter>)>
     constexpr T* insert(T* pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        return _insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
+        auto r =_insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
+        _null_terminate();
+        return r;
     }
     constexpr T* insert(T* pos, std::initializer_list<T> list)
     {
-        return _insert(pos, list.size(), [&](T* addr) { _copy_range(addr, list.begin(), list.end()); });
+        auto r = _insert(pos, list.size(), [&](T* addr) { _copy_range(addr, list.begin(), list.end()); });
+        _null_terminate();
+        return r;
     }
     constexpr T* insert(T* pos, const T& v)
     {
-        return _insert(pos, 1, [&](T* addr) { _copy_n(addr, v, 1); });
+        auto r = _insert(pos, 1, [&](T* addr) { _copy_n(addr, v, 1); });
+        _null_terminate();
+        return r;
     }
 
     constexpr T* erase(T* first, T* last)
     {
         _copy_range(first, last, end());
         _shrink(std::distance(first, last));
+        _null_terminate();
         return first;
     }
     constexpr T* erase(T* pos)
@@ -124,13 +141,86 @@ public:
         return erase(pos, pos + 1);
     }
 
+    constexpr size_t find(const basic_string& str, size_t offset = 0) const noexcept
+    {
+        return _find(str.c_str(), str.size(), offset);
+    }
+    constexpr size_t find(const T* s, size_t offset, size_t count) const noexcept
+    {
+        return _find(s, count, offset);
+    }
+    constexpr size_t find(const T* s, size_t offset = 0) const noexcept
+    {
+        return _find(s, Traits::length(s), offset);
+    }
+    constexpr size_t find(T ch, size_t offset) const noexcept
+    {
+        return _find_ch(ch, offset);
+    }
+    template<class String>
+    constexpr size_t find(const String& str, size_t offset = 0) const noexcept
+    {
+        return _find(str.c_str(), str.size(), offset);
+    }
+
+    constexpr basic_string& append(const basic_string& str)
+    {
+        insert(end(), str.begin(), str.end());
+        return *this;
+    }
+    constexpr basic_string& append(const T* s)
+    {
+        insert(end(), s, s + Traits::length(s));
+        return *this;
+    }
+    constexpr basic_string& append(const T* s, size_t size)
+    {
+        insert(end(), s, s + size);
+        return *this;
+    }
+    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    constexpr basic_string& append(Iter first, Iter last)
+    {
+        insert(end(), first, last);
+        return *this;
+    }
+    constexpr basic_string& append(std::initializer_list<T> list)
+    {
+        insert(end(), list.begin(), list.end());
+        return *this;
+    }
+    constexpr basic_string& append(T ch)
+    {
+        insert(end(), ch);
+        return *this;
+    }
+    template<class String>
+    constexpr basic_string& append(const String& str)
+    {
+        insert(end(), str.begin(), str.end());
+        return *this;
+    }
+    template<class String>
+    constexpr basic_string& append(const String& str, size_t offset, size_t count = npos)
+    {
+        auto end = count == npos ? str.end() : str.begin() + offset + npos;
+        insert(end(), str.begin() + offset, end);
+        return *this;
+    }
+
+    constexpr basic_string& operator+=(const basic_string& str) { return append(str); }
+    constexpr basic_string& operator+=(T ch) { return append(ch); }
+    constexpr basic_string& operator+=(const T* ch) { return append(ch); }
+    constexpr basic_string& operator+=(std::initializer_list<T> il) { return append(il); }
+    template<class String>
+    constexpr basic_string& operator+=(const String& str) { return append(str); }
 
 public:
     template<class Number, fc_require(std::is_integral_v<Number>)>
     inline Number to_number(size_t* idx, int base) const
     {
-        const T* start = begin();
-        const T* last = end();
+        auto start = begin();
+        auto last = end();
         while (std::isspace(*start)) {
             ++start;
         }
@@ -152,8 +242,8 @@ public:
     template<class Number, fc_require(std::is_floating_point_v<Number>)>
     inline Number to_number(size_t* idx) const
     {
-        const T* start = begin();
-        const T* last = end();
+        auto start = begin();
+        auto last = end();
         while (std::isspace(*start)) {
             ++start;
         }
@@ -198,10 +288,52 @@ protected:
     using super::_insert;
     using super::_assign;
 
+    constexpr void _null_terminate()
+    {
+        reserve(size() + 1);
+        data()[size()] = 0;
+    }
+
+    constexpr size_t _find(const T* str2, const size_t size2, const size_t offset) const noexcept
+    {
+        const T* str1 = data();
+        const size_t size1 = size();
+        if (size2 > size1 || offset > size1 - size2) {
+            return static_cast<size_t>(-1);
+        }
+        if (size2 == 0) {
+            return offset;
+        }
+
+        const auto end = str1 + (size1 - size2) + 1;
+        for (auto s = str1 + offset;; ++s) {
+            s = Traits::find(s, static_cast<size_t>(end - s), *str2);
+            if (!s) {
+                return static_cast<size_t>(-1);
+            }
+            if (Traits::compare(s, str2, size2) == 0) {
+                return static_cast<size_t>(s - str1);
+            }
+        }
+    }
+
+    constexpr size_t _find_ch(const T ch, const size_t offset) const noexcept
+    {
+        const T* str1 = data();
+        const size_t size1 = size();
+        if (offset < size1) {
+            const auto found = Traits::find(str1 + offset, size1 - offset, ch);
+            if (found) {
+                return static_cast<size_t>(found - str1);
+            }
+        }
+        return static_cast<size_t>(-1);
+    }
+
     static inline size_t _hash(const void* _data, const size_t size)
     {
-        constexpr size_t _basis = 14695981039346656037UL;
-        constexpr size_t _prime = 1099511628211UL;
+        constexpr size_t _basis = size_t(14695981039346656037U);
+        constexpr size_t _prime = size_t(1099511628211U);
         auto data = (const std::byte*)_data;
         size_t v = _basis;
         for (size_t i = 0; i < size; ++i) {
@@ -215,17 +347,17 @@ protected:
 template<class T, class M1, class M2, class Tr>
 bool operator==(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
-    return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin());
+    return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin(), &Tr::eq);
 }
 template<class T, class M1, class M2, class Tr>
 bool operator!=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
-    return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin());
+    return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin(), &Tr::eq);
 }
 template<class T, class M1, class M2, class Tr>
 bool operator<(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
-    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
+    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end(), &Tr::lt);
 }
 template<class T, class M1, class M2, class Tr>
 bool operator>(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
