@@ -7,6 +7,7 @@
 #include <set>
 #include <map>
 #include <memory>
+#include <unordered_map>
 
 #ifdef _WIN32
 #   include <nmmintrin.h>
@@ -438,6 +439,7 @@ testCase(test_constant_iterator)
 }
 
 
+
 #ifdef _WIN32
 
 __declspec(noinline)
@@ -458,7 +460,7 @@ bool streq_memcmp(const char* a, const char* b, size_t len)
     return memcmp(a, b, len) == 0;
 }
 
-// len ‚Í 8 ‚Ì”{”‚Å‚ ‚é‚±‚Æ‚ª‘O’ñ
+// len must be multiples of 8
 __declspec(noinline)
 bool streq_uint64(const char* _a, const char* _b, size_t len)
 {
@@ -473,7 +475,7 @@ bool streq_uint64(const char* _a, const char* _b, size_t len)
     return true;
 }
 
-// len ‚Í 16 ‚Ì”{”‚Å‚ ‚é‚±‚Æ‚ª‘O’ñ
+// len must be multiples of 16
 __declspec(noinline)
 bool streq_sse42(const char* _a, const char* _b, size_t len)
 {
@@ -496,6 +498,19 @@ bool streq_sse42(const char* _a, const char* _b, size_t len)
 
 testCase(test_fixed_string)
 {
+    {
+        ist::string sint = "  666   ";
+        ist::string fint = "    666.666    ";
+
+        printf("stoi: %d\n", std::stoi(sint));
+        printf("stof: %f\n", std::stof(fint));
+        printf("stod: %lf\n", std::stod(fint));
+
+        std::unordered_map<ist::string, int> hoge{{"a", 999}};
+        printf("std::unordered_map<ist::string, int>: %d\n", hoge["a"]);
+    }
+
+
 #ifdef _WIN32
     const size_t num = 1000000;
     //const size_t num = 500000;
