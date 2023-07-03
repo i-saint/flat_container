@@ -12,6 +12,12 @@ constexpr bool is_from_chars_available_v = false;
 template<typename T>
 constexpr bool is_from_chars_available_v<T, std::void_t<decltype(std::from_chars((const char*)nullptr, (const char*)nullptr, std::declval<T&>()))>> = true;
 
+template<typename Container, class Char, typename = void>
+constexpr bool is_string_like_v = false;
+template<typename Container, class Char>
+constexpr bool is_string_like_v<Container, Char, std::enable_if_t<
+    std::is_same_v<remove_const_pointer_t<decltype(std::declval<Container>().data())>, Char>>> = true;
+
 
 template<class T, class Memory, class Traits = std::char_traits<T>>
 class basic_string : public Memory
@@ -22,16 +28,21 @@ public:
 
     static const size_t npos = ~0;
 
-    constexpr basic_string() = default;
+    constexpr basic_string()
+    {
+        if (capacity() != 0) {
+            _null_terminate();
+        }
+    }
     constexpr basic_string(const basic_string& r) = default;
     constexpr basic_string(basic_string&& r) noexcept = default;
     constexpr basic_string& operator=(const basic_string& r) = default;
     constexpr basic_string& operator=(basic_string&& r) noexcept = default;
 
     template<bool view = is_memory_view_v<super>, fc_require(!view)>
-    constexpr basic_string(const T* v) { assign(v, v + traits_type::length(v)); }
+    constexpr basic_string(const T* v) { assign(v); }
     template<bool view = is_memory_view_v<super>, fc_require(!view)>
-    constexpr basic_string(const T* v, size_t n) { assign(v, v + n); }
+    constexpr basic_string(const T* v, size_t n) { assign(v, n); }
 
     template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_string(std::initializer_list<T> r) { assign(r); }
@@ -39,9 +50,13 @@ public:
     template<class Iter, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_iterator_v<Iter>)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
+    template<class String, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_string_like_v<String, T>)>
+    constexpr basic_string(const String& str) { assign(str); }
+
     template<bool view = is_memory_view_v<super>, fc_require(view)>
     constexpr basic_string(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
+        , basic_string()
     {
     }
 
@@ -90,29 +105,75 @@ public:
         _null_terminate();
     }
 
+    constexpr basic_string& assign(const T* str, size_t n)
+    {
+        _assign(n, [&](T* dst) { _copy_range(dst, str, str + n); });
+        _null_terminate();
+        return *this;
+    }
+    constexpr basic_string& assign(const T* str)
+    {
+        return assign(str, Traits::length(str));
+    }
+    constexpr basic_string& assign(size_t n, T ch)
+    {
+        _assign(n, [&](T* dst) { _copy_n(dst, ch, n); });
+        _null_terminate();
+        return *this;
+    }
+    constexpr basic_string& assign(std::initializer_list<T> list)
+    {
+        _assign(list.size(), [&](T* dst) { _copy_range(dst, list.begin(), list.end()); });
+        _null_terminate();
+        return *this;
+    }
     template<class Iter, fc_require(is_iterator_v<Iter>)>
-    constexpr void assign(Iter first, Iter last)
+    constexpr basic_string& assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
         _assign(n, [&](T* dst) { _copy_range(dst, first, last); });
         _null_terminate();
+        return *this;
     }
-    constexpr void assign(std::initializer_list<T> list)
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr basic_string& assign(const String& str, size_t offset, size_t count = npos)
     {
-        _assign(list.size(), [&](T* dst) { _copy_range(dst, list.begin(), list.end()); });
-        _null_terminate();
+        size_t n = count == npos ? str.size() - offset : count;
+        auto first = str.begin() + offset;
+        auto last = str.begin() + offset + n;
+        return assign(first, last);
     }
-    constexpr void assign(size_t n, const T& v)
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr basic_string& assign(const String& str)
     {
-        _assign(n, [&](T* dst) { _copy_n(dst, v, n); });
-        _null_terminate();
+        return assign(str, 0, npos);
     }
 
+    constexpr T* insert(T* pos, T* str, size_t n)
+    {
+        auto r = _insert(pos, n, [&](T* addr) { _copy_range(addr, str, str + n); });
+        _null_terminate();
+        return r;
+    }
+    constexpr T* insert(T* pos, T* str)
+    {
+        return insert(pos, str, Traits::length(str));
+    }
+    constexpr T* insert(T* pos, T ch)
+    {
+        return insert(pos, &ch, 1);
+    }
+    constexpr T* insert(T* pos, size_t n, T v)
+    {
+        auto r = _insert(pos, n, [&](T* addr) { _copy_n(addr, v, n); });
+        _null_terminate();
+        return r;
+    }
     template<class Iter, fc_require(is_iterator_v<Iter>)>
     constexpr T* insert(T* pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        auto r =_insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
+        auto r = _insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
         _null_terminate();
         return r;
     }
@@ -122,61 +183,50 @@ public:
         _null_terminate();
         return r;
     }
-    constexpr T* insert(T* pos, const T& v)
+
+    constexpr basic_string& insert(size_t pos, const T* str, size_t offset, size_t count = npos)
     {
-        auto r = _insert(pos, 1, [&](T* addr) { _copy_n(addr, v, 1); });
+        size_t n = count == npos ? Traits::length(str) - offset : count;
+        auto first = str;
+        auto last = str + n;
+        _insert(begin() + pos, n, [&](T* addr) { _copy_range(addr, first, last); });
         _null_terminate();
-        return r;
-    }
-
-    constexpr T* erase(T* first, T* last)
-    {
-        _copy_range(first, last, end());
-        _shrink(std::distance(first, last));
-        _null_terminate();
-        return first;
-    }
-    constexpr T* erase(T* pos)
-    {
-        return erase(pos, pos + 1);
-    }
-
-    constexpr size_t find(const basic_string& str, size_t offset = 0) const noexcept
-    {
-        return _find(str.c_str(), str.size(), offset);
-    }
-    constexpr size_t find(const T* s, size_t offset, size_t count) const noexcept
-    {
-        return _find(s, count, offset);
-    }
-    constexpr size_t find(const T* s, size_t offset = 0) const noexcept
-    {
-        return _find(s, Traits::length(s), offset);
-    }
-    constexpr size_t find(T ch, size_t offset) const noexcept
-    {
-        return _find_ch(ch, offset);
-    }
-    template<class String>
-    constexpr size_t find(const String& str, size_t offset = 0) const noexcept
-    {
-        return _find(str.c_str(), str.size(), offset);
-    }
-
-    constexpr basic_string& append(const basic_string& str)
-    {
-        insert(end(), str.begin(), str.end());
         return *this;
     }
-    constexpr basic_string& append(const T* s)
+    constexpr basic_string& insert(size_t pos, const T* str)
     {
-        insert(end(), s, s + Traits::length(s));
+        return insert(pos, str, 0, Traits::length(str));
+    }
+    constexpr basic_string& insert(size_t pos, size_t count, T ch)
+    {
+        return insert(pos, &ch, 0, 1);
+    }
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr basic_string& insert(size_t pos, const String& str, size_t offset, size_t count = npos)
+    {
+        size_t n = count == npos ? str.size() - offset : count;
+        auto first = str.begin() + offset;
+        auto last = str.begin() + offset + n;
+        insert(begin() + pos, first, last);
         return *this;
     }
-    constexpr basic_string& append(const T* s, size_t size)
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr basic_string& insert(size_t pos, const String& str)
     {
-        insert(end(), s, s + size);
-        return *this;
+        return insert(pos, str, 0, npos);
+    }
+
+    constexpr basic_string& append(const T* str, size_t count)
+    {
+        return insert(size(), str, 0, count);
+    }
+    constexpr basic_string& append(const T* str)
+    {
+        return insert(size(), str);
+    }
+    constexpr basic_string& append(T ch)
+    {
+        return insert(size(), 1, ch);
     }
     template<class Iter, fc_require(is_iterator_v<Iter>)>
     constexpr basic_string& append(Iter first, Iter last)
@@ -189,31 +239,94 @@ public:
         insert(end(), list.begin(), list.end());
         return *this;
     }
-    constexpr basic_string& append(T ch)
-    {
-        insert(end(), ch);
-        return *this;
-    }
-    template<class String>
+    template<class String, fc_require(is_string_like_v<String, T>)>
     constexpr basic_string& append(const String& str)
     {
-        insert(end(), str.begin(), str.end());
-        return *this;
+        return insert(size(), str);
     }
-    template<class String>
+    template<class String, fc_require(is_string_like_v<String, T>)>
     constexpr basic_string& append(const String& str, size_t offset, size_t count = npos)
     {
-        auto end = count == npos ? str.end() : str.begin() + offset + npos;
-        insert(end(), str.begin() + offset, end);
-        return *this;
+        return insert(size(), str, offset, count);
     }
 
-    constexpr basic_string& operator+=(const basic_string& str) { return append(str); }
     constexpr basic_string& operator+=(T ch) { return append(ch); }
     constexpr basic_string& operator+=(const T* ch) { return append(ch); }
     constexpr basic_string& operator+=(std::initializer_list<T> il) { return append(il); }
-    template<class String>
+    template<class String, fc_require(is_string_like_v<String, T>)>
     constexpr basic_string& operator+=(const String& str) { return append(str); }
+
+    constexpr T* erase(T* first, T* last)
+    {
+        _copy_range(first, last, end());
+        _shrink(std::distance(first, last));
+        _null_terminate();
+        return first;
+    }
+    constexpr T* erase(T* pos)
+    {
+        return erase(pos, pos + 1);
+    }
+    constexpr basic_string& erase(size_t offset = 0, size_t count = npos)
+    {
+        size_t n = count == npos ? size() - offset : count;
+        auto first = begin() + offset;
+        auto last = begin() + offset + n;
+        erase(first, last);
+        return *this;
+    }
+
+    constexpr size_t find(const T* s, size_t offset, size_t count) const noexcept
+    {
+        return _find(s, count, offset);
+    }
+    constexpr size_t find(const T* s, size_t offset = 0) const noexcept
+    {
+        return _find(s, Traits::length(s), offset);
+    }
+    constexpr size_t find(T ch, size_t offset) const noexcept
+    {
+        return _find_ch(ch, offset);
+    }
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr size_t find(const String& str, size_t offset = 0) const noexcept
+    {
+        return _find(str.data(), str.size(), offset);
+    }
+
+    constexpr bool starts_with(T ch) const noexcept
+    {
+        return size() >= 1 && Traits::compare(data(), &ch, 1) == 0;
+    }
+    constexpr bool starts_with(const T* str) const noexcept
+    {
+        size_t n = Traits::length(str);
+        return size() >= n && Traits::compare(data(), str, n) == 0;
+    }
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr bool starts_with(const String& str) const noexcept
+    {
+        size_t n = str.size();
+        return size() >= n && Traits::compare(data(), str.data(), n) == 0;
+    }
+
+    constexpr bool ends_with(T ch) const noexcept
+    {
+        return size() >= 1 && Traits::compare(data() + size() - 1, &ch, 1) == 0;
+    }
+    constexpr bool ends_with(const T* str) const noexcept
+    {
+        size_t n = Traits::length(str);
+        return size() >= n && Traits::compare(data() + size() - n, str, n) == 0;
+    }
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr bool ends_with(const String& str) const noexcept
+    {
+        size_t n = str.size();
+        return size() >= n && Traits::compare(data() + size() - n, str.data(), n) == 0;
+    }
+
+    constexpr operator std::basic_string_view<T, Traits>() const noexcept { return { data(), size() }; }
 
 public:
     template<class Number, fc_require(std::is_integral_v<Number>)>
@@ -294,7 +407,7 @@ protected:
         data()[size()] = 0;
     }
 
-    constexpr size_t _find(const T* str2, const size_t size2, const size_t offset) const noexcept
+    constexpr size_t _find(const T* str2, size_t size2, size_t offset) const noexcept
     {
         const T* str1 = data();
         const size_t size1 = size();
@@ -317,7 +430,7 @@ protected:
         }
     }
 
-    constexpr size_t _find_ch(const T ch, const size_t offset) const noexcept
+    constexpr size_t _find_ch(T ch, size_t offset) const noexcept
     {
         const T* str1 = data();
         const size_t size1 = size();
@@ -330,7 +443,7 @@ protected:
         return static_cast<size_t>(-1);
     }
 
-    static inline size_t _hash(const void* _data, const size_t size)
+    static inline size_t _hash(const void* _data, size_t size)
     {
         constexpr size_t _basis = size_t(14695981039346656037U);
         constexpr size_t _prime = size_t(1099511628211U);

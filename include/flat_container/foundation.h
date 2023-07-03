@@ -28,6 +28,9 @@ constexpr bool is_iterator_v<T, typename std::enable_if_t<!std::is_same_v<typena
 template<typename T>
 constexpr bool is_pod_v = std::is_trivially_constructible_v<T>;
 
+template<typename T>
+using remove_const_pointer_t = std::remove_const_t<std::remove_pointer_t<T>>;
+
 
 template<class ThisT, class T>
 class memory_boilerplate
@@ -230,9 +233,7 @@ protected:
         size_t new_size = get().size_ + n;
         get().reserve(new_size);
         _capacity_check(new_size);
-        for (size_t i = get().size_; i < new_size; ++i) {
-            construct(get().data_ + i);
-        }
+        construct(get().data_ + get().size_);
         get().size_ = new_size;
     }
 
@@ -243,7 +244,12 @@ protected:
             _shrink(get().size_ - n);
         }
         else if (n > get().size_) {
-            _expand(n - get().size_, std::move(construct));
+            size_t exn = n - get().size_;
+            _expand(exn, [&](pointer addr) {
+                for (size_t i = 0; i < exn; ++i) {
+                    construct(addr + i);
+                }
+                });
         }
     }
 

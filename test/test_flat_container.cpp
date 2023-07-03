@@ -499,6 +499,7 @@ bool streq_sse42(const char* _a, const char* _b, size_t len)
 testCase(test_fixed_string)
 {
     {
+        ist::fixed_string<32> empty;
         ist::string sint = "  666   ";
         ist::string fint = "    666.666    ";
 
@@ -513,14 +514,21 @@ testCase(test_fixed_string)
         ist::fixed_string<32> abc = "12345";
         ist::fixed_string<32> def = "67890";
 
-#define cmp(exp) printf(#exp ": %d\n", (int)(exp))
-        cmp(abc == def);
-        cmp(abc != def);
-        cmp(abc < def);
-        cmp(abc <= def);
-        cmp(abc > def);
-        cmp(abc >= def);
-#undef cmp
+#define check(exp) printf(#exp ": %d\n", (int)(exp))
+        check(!(abc == def));
+        check( (abc != def));
+        check( (abc <  def));
+        check( (abc <= def));
+        check(!(abc >  def));
+        check(!(abc >= def));
+
+        check(abc.starts_with('1'));
+        check(abc.starts_with("123"));
+        check(abc.starts_with(std::string_view("123")));
+        check(abc.ends_with('5'));
+        check(abc.ends_with("345"));
+        check(abc.ends_with(std::string_view("345")));
+#undef check
 
         abc += '?';
         abc += "hoge";
