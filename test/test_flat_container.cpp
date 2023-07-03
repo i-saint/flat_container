@@ -514,7 +514,7 @@ testCase(test_fixed_string)
         ist::fixed_string<32> abc = "12345";
         ist::fixed_string<32> def = "67890";
 
-#define check(exp) printf(#exp ": %d\n", (int)(exp))
+#define check(exp) testExpect(exp); printf(#exp ": %d\n", (int)(exp))
         check(!(abc == def));
         check( (abc != def));
         check( (abc <  def));
@@ -531,12 +531,29 @@ testCase(test_fixed_string)
 #undef check
 
         abc += '?';
+        testExpect(abc == "12345?");
+
         abc += "hoge";
+        testExpect(abc == "12345?hoge");
+
         abc += {'a', 'b', 'c'};
+        testExpect(abc == "12345?hogeabc");
+
         abc += std::string_view("def");
+        testExpect(abc == "12345?hogeabcdef");
 
         auto pos = abc.find("345");
         testExpect(abc[pos] == '3');
+
+        abc.replace(abc.begin() + 3, abc.begin() + 5, "6789");
+        testExpect(abc == "1236789?hogeabcdef");
+
+        abc.replace(abc.find("?"), 11, std::string_view(""));
+        testExpect(abc == "1236789");
+
+        pos = abc.find("345");
+        testExpect(pos == ~0);
+
     }
 
 

@@ -28,8 +28,9 @@ constexpr bool is_iterator_v<T, typename std::enable_if_t<!std::is_same_v<typena
 template<typename T>
 constexpr bool is_pod_v = std::is_trivially_constructible_v<T>;
 
+// std::remove_cvref require C++20 so define our own
 template<typename T>
-using remove_const_pointer_t = std::remove_const_t<std::remove_pointer_t<T>>;
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 
 template<class ThisT, class T>

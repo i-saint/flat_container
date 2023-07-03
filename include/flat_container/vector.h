@@ -8,6 +8,9 @@ class basic_vector : public Memory
 {
 using super = Memory;
 public:
+    using typename super::iterator;
+    using typename super::const_iterator;
+
     constexpr basic_vector() = default;
     constexpr basic_vector(const basic_vector& r) = default;
     constexpr basic_vector(basic_vector&& r) noexcept = default;
@@ -97,37 +100,37 @@ public:
     }
 
     template<class Iter, fc_require(is_iterator_v<Iter>)>
-    constexpr T* insert(T* pos, Iter first, Iter last)
+    constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
         return _insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
     }
-    constexpr T* insert(T* pos, std::initializer_list<T> list)
+    constexpr iterator insert(iterator pos, std::initializer_list<T> list)
     {
         return _insert(pos, list.size(), [&](T* addr) { _copy_range(addr, list.begin(), list.end()); });
     }
-    constexpr T* insert(T* pos, const T& v)
+    constexpr iterator insert(iterator pos, const T& v)
     {
         return _insert(pos, 1, [&](T* addr) { _copy_n(addr, v, 1); });
     }
-    constexpr T* insert(T* pos, T&& v)
+    constexpr iterator insert(iterator pos, T&& v)
     {
         return _insert(pos, 1, [&](T* addr) { _move_one(addr, std::move(v)); });
     }
     template< class... Args >
-    constexpr T* emplace(T* pos, Args&&... args)
+    constexpr iterator emplace(iterator pos, Args&&... args)
     {
         return _insert(pos, 1, [&](T* addr) { _emplace_one(addr, std::forward<Args>(args)...); });
     }
 
-    constexpr T* erase(T* first, T* last)
+    constexpr iterator erase(iterator first, iterator last)
     {
         size_t s = std::distance(first, last);
         std::move(last, end(), first);
         _shrink(s);
         return first;
     }
-    constexpr T* erase(T* pos)
+    constexpr iterator erase(iterator pos)
     {
         return erase(pos, pos + 1);
     }

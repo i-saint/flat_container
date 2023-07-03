@@ -11,6 +11,9 @@ public:
     // T must be pod
     static_assert(is_pod_v<T>);
 
+    using typename super::iterator;
+    using typename super::const_iterator;
+
     constexpr basic_raw_vector() = default;
     constexpr basic_raw_vector(const basic_raw_vector& r) = default;
     constexpr basic_raw_vector(basic_raw_vector&& r) noexcept = default;
@@ -96,32 +99,32 @@ public:
     }
 
     template<class Iter, fc_require(is_iterator_v<Iter>)>
-    constexpr T* insert(T* pos, Iter first, Iter last)
+    constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
         return _insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
     }
-    constexpr T* insert(T* pos, std::initializer_list<T> list)
+    constexpr iterator insert(iterator pos, std::initializer_list<T> list)
     {
         return _insert(pos, list.size(), [&](T* addr) { _copy_range(addr, list.begin(), list.end()); });
     }
-    constexpr T* insert(T* pos, const T& v)
+    constexpr iterator insert(iterator pos, const T& v)
     {
         return _insert(pos, 1, [&](T* addr) { _copy_n(addr, v, 1); });
     }
     template< class... Args >
-    constexpr T* emplace(T* pos, Args&&... args)
+    constexpr iterator emplace(iterator pos, Args&&... args)
     {
         return _insert(pos, 1, [&](T* addr) { _emplace_one(addr, std::forward<Args>(args)...); });
     }
 
-    constexpr T* erase(T* first, T* last)
+    constexpr iterator erase(iterator first, iterator last)
     {
         _copy_range(first, last, end());
         _shrink(std::distance(first, last));
         return first;
     }
-    constexpr T* erase(T* pos)
+    constexpr iterator erase(iterator pos)
     {
         return erase(pos, pos + 1);
     }
