@@ -16,7 +16,7 @@ template<typename Container, class Char, typename = void>
 constexpr bool is_string_like_v = false;
 template<typename Container, class Char>
 constexpr bool is_string_like_v<Container, Char, std::enable_if_t<
-    std::is_same_v<remove_cvref_t<decltype(*std::declval<Container>().begin())>, Char>>> = true;
+    std::is_same_v<std::decay_t<decltype(*std::declval<Container>().data())>, Char>>> = true;
 
 
 template<class T, class Memory, class Traits = std::char_traits<T>>
@@ -40,6 +40,9 @@ public:
     constexpr basic_string(basic_string&& r) noexcept = default;
     constexpr basic_string& operator=(const basic_string& r) = default;
     constexpr basic_string& operator=(basic_string&& r) noexcept = default;
+
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    constexpr basic_string(size_t n, T ch) { assign(n, ch); }
 
     template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_string(const T* v) { assign(v); }
@@ -71,7 +74,6 @@ public:
     using super::clear;
 
     using super::empty;
-    using super::full;
     using super::begin;
     using super::cbegin;
     using super::end;
@@ -106,6 +108,9 @@ public:
         _shrink(1);
         _null_terminate();
     }
+
+
+    // assign
 
     constexpr basic_string& assign(const T* str, size_t n)
     {
@@ -150,6 +155,9 @@ public:
     {
         return assign(str, 0, npos);
     }
+
+
+    // insert
 
     constexpr iterator insert(iterator pos, T* str, size_t n)
     {
@@ -218,6 +226,9 @@ public:
         return insert(pos, str, 0, npos);
     }
 
+
+    // append
+
     constexpr basic_string& append(const T* str, size_t count)
     {
         return insert(size(), str, 0, count);
@@ -258,6 +269,9 @@ public:
     template<class String, fc_require(is_string_like_v<String, T>)>
     constexpr basic_string& operator+=(const String& str) { return append(str); }
 
+
+    // erase
+
     constexpr iterator erase(iterator first, iterator last)
     {
         _copy_range(first, last, end());
@@ -277,6 +291,9 @@ public:
         erase(first, last);
         return *this;
     }
+
+
+    // replace
 
     template<class Iter, fc_require(is_iterator_v<Iter>)>
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
@@ -314,13 +331,13 @@ public:
         return replace(first, last, list.begin(), list.end());
     }
     template<class String, fc_require(is_string_like_v<String, T>)>
-    constexpr basic_string& replace(size_t pos, size_t count, const String& str, size_t offset, size_t count2 = npos)
+    constexpr basic_string& replace(size_t pos, size_t count, const String& str, size_t pos2, size_t count2 = npos)
     {
         auto first = begin() + pos;
         auto last = begin() + pos + count;
-        size_t n = count2 == npos ? str.size() - offset : count2;
-        auto first2 = str.begin() + offset;
-        auto last2 = str.begin() + offset + n;
+        size_t n = count2 == npos ? str.size() - pos2 : count2;
+        auto first2 = str.begin() + pos2;
+        auto last2 = str.begin() + pos2 + n;
         return replace(first, last, first2, last2);
     }
     template<class String, fc_require(is_string_like_v<String, T>)>
@@ -329,23 +346,29 @@ public:
         return replace(pos, count, str, 0, str.size());
     }
 
-    constexpr size_t find(const T* str, size_t offset, size_t count) const noexcept
+
+    // find
+
+    constexpr size_t find(const T* str, size_t pos, size_t count) const noexcept
     {
-        return _find(str, count, offset);
+        return _find_str(str, count, pos);
     }
-    constexpr size_t find(const T* str, size_t offset = 0) const noexcept
+    constexpr size_t find(const T* str, size_t pos = 0) const noexcept
     {
-        return _find(str, Traits::length(str), offset);
+        return _find_str(str, Traits::length(str), pos);
     }
-    constexpr size_t find(T ch, size_t offset) const noexcept
+    constexpr size_t find(T ch, size_t pos = 0) const noexcept
     {
-        return _find_ch(ch, offset);
+        return _find_ch(ch, pos);
     }
     template<class String, fc_require(is_string_like_v<String, T>)>
-    constexpr size_t find(const String& str, size_t offset = 0) const noexcept
+    constexpr size_t find(const String& str, size_t pos = 0) const noexcept
     {
-        return _find(str.data(), str.size(), offset);
+        return _find_str(str.data(), str.size(), pos);
     }
+
+
+    // starts_with
 
     constexpr bool starts_with(T ch) const noexcept
     {
@@ -363,6 +386,9 @@ public:
         return size() >= n && Traits::compare(data(), str.data(), n) == 0;
     }
 
+
+    // ends_with
+
     constexpr bool ends_with(T ch) const noexcept
     {
         return size() >= 1 && Traits::compare(data() + size() - 1, &ch, 1) == 0;
@@ -379,7 +405,65 @@ public:
         return size() >= n && Traits::compare(data() + size() - n, str.data(), n) == 0;
     }
 
-    constexpr operator std::basic_string_view<T, Traits>() const noexcept { return { data(), size() }; }
+
+    // compare
+
+    constexpr int compare(size_t pos1, size_t count1, const T* str, size_t pos2, size_t count2) const noexcept
+    {
+        return Traits::compare(data() + pos1, str + pos2, std::max(count1, count2));
+    }
+    constexpr int compare(size_t pos1, size_t count1, const T* str) const noexcept
+    {
+        return compare(pos1, count1, str, 0, Traits::length(str));
+    }
+    constexpr int compare(const T* str) const noexcept
+    {
+        return compare(0, size(), str, 0, Traits::length(str));
+    }
+
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr int compare(size_t pos1, size_t count1, const String& str, size_t pos2, size_t count2 = npos) const noexcept
+    {
+        count2 = count2 == npos ? str.size() - pos2 : count2;
+        return compare(pos1, count1, str.data(), pos2, count2);
+    }
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr int compare(size_t pos1, size_t count1, const String& str) const noexcept
+    {
+        return compare(pos1, count1, str, 0, str.size());
+    }
+    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr int compare(const String& str) const noexcept
+    {
+        return compare(0, size(), str, 0, str.size());
+    }
+
+
+    // substr
+
+    constexpr basic_string substr(size_t pos = 0, size_t count = npos) const
+    {
+        count = count == npos ? size() - pos : count;
+        return basic_string{ data() + pos, count };
+    }
+
+
+    // copy
+
+    constexpr size_t copy(T* dest, size_t count, size_t pos = 0)
+    {
+        count = count == npos ? size() - pos : count;
+        Traits::copy(dest, data() + pos, count);
+        return count;
+    }
+
+
+    // std::string_view
+
+    constexpr operator std::basic_string_view<T, Traits>() const noexcept
+    {
+        return { data(), size() };
+    }
 
 public:
     template<class Number, fc_require(std::is_integral_v<Number>)>
@@ -460,7 +544,19 @@ protected:
         data()[size()] = 0;
     }
 
-    constexpr size_t _find(const T* str2, size_t size2, size_t offset) const noexcept
+    constexpr size_t _find_ch(T ch, size_t offset) const noexcept
+    {
+        const T* str1 = data();
+        const size_t size1 = size();
+        if (offset < size1) {
+            const auto found = Traits::find(str1 + offset, size1 - offset, ch);
+            if (found) {
+                return static_cast<size_t>(found - str1);
+            }
+        }
+        return static_cast<size_t>(-1);
+    }
+    constexpr size_t _find_str(const T* str2, size_t size2, size_t offset) const noexcept
     {
         const T* str1 = data();
         const size_t size1 = size();
@@ -481,19 +577,6 @@ protected:
                 return static_cast<size_t>(s - str1);
             }
         }
-    }
-
-    constexpr size_t _find_ch(T ch, size_t offset) const noexcept
-    {
-        const T* str1 = data();
-        const size_t size1 = size();
-        if (offset < size1) {
-            const auto found = Traits::find(str1 + offset, size1 - offset, ch);
-            if (found) {
-                return static_cast<size_t>(found - str1);
-            }
-        }
-        return static_cast<size_t>(-1);
     }
 
     template<class Copy>
@@ -526,67 +609,157 @@ protected:
     }
 };
 
-template<class T, class M1, class M2, class Tr>
-bool operator==(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+// operator +
+
+template<class T, class M, class Tr>
+inline basic_string<T, M, Tr> operator+(const basic_string<T, M, Tr>& l, T r)
 {
-    return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin(), &Tr::eq);
+    basic_string<T, M, Tr> tmp{l};
+    tmp += r;
+    return tmp;
+}
+template<class T, class M, class Tr>
+inline basic_string<T, M, Tr> operator+(T l, const basic_string<T, M, Tr>& r)
+{
+    return basic_string<T, M, Tr>{l} + r;
+}
+
+template<class T, class M, class Tr>
+inline basic_string<T, M, Tr> operator+(const basic_string<T, M, Tr>& l, const T* r)
+{
+    basic_string<T, M, Tr> tmp{l};
+    tmp += r;
+    return tmp;
+}
+template<class T, class M, class Tr>
+inline basic_string<T, M, Tr> operator+(const T* l, const basic_string<T, M, Tr>& r)
+{
+    return basic_string<T, M, Tr>{l} + r;
+}
+
+template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
+inline basic_string<T, M, Tr> operator+(const basic_string<T, M, Tr>& l, const String& r)
+{
+    basic_string<T, M, Tr> tmp{l};
+    tmp += r;
+    return tmp;
+}
+template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
+inline basic_string<T, M, Tr> operator+(const String& l, const basic_string<T, M, Tr>& r)
+{
+    return basic_string<T, M, Tr>{l} + r;
+}
+
+template<class T, class M, class Tr>
+inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, T r)
+{
+    l += r;
+    return l;
+}
+template<class T, class M, class Tr>
+inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const T* r)
+{
+    l += r;
+    return l;
+}
+template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
+inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const String& r)
+{
+    l += r;
+    return l;
+}
+
+// operator ==, !=, <, <=, >, >=
+
+template<class T, class M1, class M2, class Tr>
+inline bool operator==(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+{
+    return l.compare(r) == 0;
 }
 template<class T, class M1, class M2, class Tr>
-bool operator!=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+inline bool operator!=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
-    return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin(), &Tr::eq);
+    return l.compare(r) != 0;
 }
 template<class T, class M1, class M2, class Tr>
-bool operator<(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+inline bool operator<(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
-    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end(), &Tr::lt);
+    return l.compare(r) < 0;
 }
 template<class T, class M1, class M2, class Tr>
-bool operator>(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+inline bool operator>(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
     return r < l;
 }
 template<class T, class M1, class M2, class Tr>
-bool operator<=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+inline bool operator<=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
     return !(r < l);
 }
 template<class T, class M1, class M2, class Tr>
-bool operator>=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
+inline bool operator>=(const basic_string<T, M1, Tr>& l, const basic_string<T, M2, Tr>& r)
 {
     return !(l < r);
 }
 
 template<class T, class M, class Tr>
-bool operator==(const basic_string<T, M, Tr>& l, const T* r)
+inline bool operator==(const basic_string<T, M, Tr>& l, const T* r)
 {
-    size_t n = Tr::length(r);
-    return l.size() == n && std::equal(l.begin(), l.end(), r, &Tr::eq);
+    return l.compare(r) == 0;
 }
 template<class T, class M, class Tr>
-bool operator!=(const basic_string<T, M, Tr>& l, const T* r)
+inline bool operator!=(const basic_string<T, M, Tr>& l, const T* r)
 {
-    size_t n = Tr::length(r);
-    return l.size() != n || !std::equal(l.begin(), l.end(), r, &Tr::eq);
+    return l.compare(r) != 0;
 }
 template<class T, class M, class Tr>
-bool operator<(const basic_string<T, M, Tr>& l, const T* r)
+inline bool operator<(const basic_string<T, M, Tr>& l, const T* r)
 {
-    size_t n = Tr::length(r);
-    return std::lexicographical_compare(l.begin(), l.end(), r, r + n, &Tr::lt);
+    return l.compare(r) < 0;
 }
 template<class T, class M, class Tr>
-bool operator>(const basic_string<T, M, Tr>& l, const T* r)
+inline bool operator>(const basic_string<T, M, Tr>& l, const T* r)
 {
     return r < l;
 }
 template<class T, class M, class Tr>
-bool operator<=(const basic_string<T, M, Tr>& l, const T* r)
+inline bool operator<=(const basic_string<T, M, Tr>& l, const T* r)
 {
     return !(r < l);
 }
 template<class T, class M, class Tr>
-bool operator>=(const basic_string<T, M, Tr>& l, const T* r)
+inline bool operator>=(const basic_string<T, M, Tr>& l, const T* r)
+{
+    return !(l < r);
+}
+
+template<class T, class M, class Tr>
+inline bool operator==(const T* l, const basic_string<T, M, Tr>& r)
+{
+    return r.compare(l) == 0;
+}
+template<class T, class M, class Tr>
+inline bool operator!=(const T* l, const basic_string<T, M, Tr>& r)
+{
+    return r.compare(l) != 0;
+}
+template<class T, class M, class Tr>
+inline bool operator<(const T* l, const basic_string<T, M, Tr>& r)
+{
+    return r.compare(l) > 0;
+}
+template<class T, class M, class Tr>
+inline bool operator>(const T* l, const basic_string<T, M, Tr>& r)
+{
+    return r < l;
+}
+template<class T, class M, class Tr>
+inline bool operator<=(const T* l, const basic_string<T, M, Tr>& r)
+{
+    return !(r < l);
+}
+template<class T, class M, class Tr>
+inline bool operator>=(const T* l, const basic_string<T, M, Tr>& r)
 {
     return !(l < r);
 }

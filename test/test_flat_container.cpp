@@ -522,13 +522,27 @@ testCase(test_fixed_string)
         check(!(abc >  def));
         check(!(abc >= def));
 
-        check(abc.starts_with('1'));
-        check(abc.starts_with("123"));
-        check(abc.starts_with(std::string_view("123")));
-        check(abc.ends_with('5'));
-        check(abc.ends_with("345"));
-        check(abc.ends_with(std::string_view("345")));
+        check(!(abc == def.data()));
+        check( (abc != def.data()));
+        check( (abc <  def.data()));
+        check( (abc <= def.data()));
+        check(!(abc >  def.data()));
+        check(!(abc >= def.data()));
+
+        check(!(abc.data() == def));
+        check( (abc.data() != def));
+        check( (abc.data() <  def));
+        check( (abc.data() <= def));
+        check(!(abc.data() >  def));
+        check(!(abc.data() >= def));
 #undef check
+
+        testExpect(abc.starts_with('1'));
+        testExpect(abc.starts_with("123"));
+        testExpect(abc.starts_with(std::string_view("123")));
+        testExpect(abc.ends_with('5'));
+        testExpect(abc.ends_with("345"));
+        testExpect(abc.ends_with(std::string_view("345")));
 
         abc += '?';
         testExpect(abc == "12345?");
@@ -554,6 +568,19 @@ testCase(test_fixed_string)
         pos = abc.find("345");
         testExpect(pos == ~0);
 
+        abc = abc + 'a';
+        abc = std::move(abc) + 'b';
+        abc = abc + "cd";
+        abc = std::move(abc) + "ef";
+        abc = abc + std::string_view("gh");
+        abc = std::move(abc) + std::string_view("ij");
+        abc = 'z' + abc;
+        abc = "xy" + abc;
+        abc = std::string_view("vw") + abc;
+        testExpect(abc == "vwxyz1236789abcdefghij");
+
+        auto xyz = abc.substr(2, 3);
+        testExpect(xyz == "xyz");
     }
 
 

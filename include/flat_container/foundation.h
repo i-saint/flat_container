@@ -16,6 +16,21 @@
 namespace ist {
 
 template <typename T, typename = void>
+constexpr bool is_dynamic_memory_v = false;
+template <typename T>
+constexpr bool is_dynamic_memory_v<T, std::enable_if_t<T::is_dynamic_memory>> = true;
+
+template <typename T, typename = void>
+constexpr bool is_sbo_memory_v = false;
+template <typename T>
+constexpr bool is_sbo_memory_v<T, std::enable_if_t<T::is_sbo_memory>> = true;
+
+template <typename T, typename = void>
+constexpr bool is_fixed_memory_v = false;
+template <typename T>
+constexpr bool is_fixed_memory_v<T, std::enable_if_t<T::is_fixed_memory>> = true;
+
+template <typename T, typename = void>
 constexpr bool is_memory_view_v = false;
 template <typename T>
 constexpr bool is_memory_view_v<T, std::enable_if_t<T::is_memory_view>> = true;
@@ -27,10 +42,6 @@ constexpr bool is_iterator_v<T, typename std::enable_if_t<!std::is_same_v<typena
 
 template<typename T>
 constexpr bool is_pod_v = std::is_trivially_constructible_v<T>;
-
-// std::remove_cvref require C++20 so define our own
-template<typename T>
-using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 
 template<class ThisT, class T>
@@ -52,7 +63,6 @@ public:
     constexpr const_pointer data() const noexcept { return get().data_; }
 
     constexpr bool empty() const noexcept { return get().size_ == 0; }
-    constexpr bool full() const noexcept { return get().size_ == get().capacity_; }
     constexpr iterator begin() noexcept { return get().data_; }
     constexpr const_iterator begin() const noexcept { return get().data_; }
     constexpr const_iterator cbegin() const noexcept { return get().data_; }
@@ -319,6 +329,8 @@ class dynamic_memory : public memory_boilerplate<dynamic_memory<T>, T>
 {
 template<class X, class Y> friend class memory_boilerplate;
 public:
+    static const bool is_dynamic_memory = true;
+
     dynamic_memory() {}
     dynamic_memory(const dynamic_memory& r) { operator=(r); }
     dynamic_memory(dynamic_memory&& r) noexcept { operator=(std::move(r)); }
@@ -404,6 +416,9 @@ class sbo_memory : public memory_boilerplate<sbo_memory<T, Capacity>, T>
 {
 template<class X, class Y> friend class memory_boilerplate;
 public:
+    static const bool is_sbo_memory = true;
+    static const size_t fixed_capacity = Capacity;
+
 #pragma warning(disable:26495)
     sbo_memory() {}
 #pragma warning(default:26495)
@@ -510,6 +525,9 @@ class fixed_memory : public memory_boilerplate<fixed_memory<T, Capacity>, T>
 {
 template<class X, class Y> friend class memory_boilerplate;
 public:
+    static const bool is_fixed_memory = true;
+    static const size_t fixed_capacity = Capacity;
+
     // suppress warning for uninitialized members
 #pragma warning(disable:26495)
     fixed_memory() {}

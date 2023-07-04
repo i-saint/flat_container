@@ -47,7 +47,6 @@ public:
     using super::clear;
 
     using super::empty;
-    using super::full;
     using super::begin;
     using super::cbegin;
     using super::end;
@@ -144,32 +143,32 @@ protected:
 };
 
 template<class T, class M1, class M2>
-bool operator==(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
+inline bool operator==(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
 {
     return l.size() == r.size() && std::memcmp(l.data(), r.data(), l.size_bytes()) == 0;
 }
 template<class T, class M1, class M2>
-bool operator!=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
+inline bool operator!=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
 {
     return l.size() != r.size() || std::memcmp(l.data(), r.data(), l.size_bytes()) != 0;
 }
 template<class T, class M1, class M2>
-bool operator<(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
+inline bool operator<(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
 {
     return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
 }
 template<class T, class M1, class M2>
-bool operator>(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
+inline bool operator>(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
 {
     return r < l;
 }
 template<class T, class M1, class M2>
-bool operator<=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
+inline bool operator<=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
 {
     return !(r < l);
 }
 template<class T, class M1, class M2>
-bool operator>=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
+inline bool operator>=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<T, M2>& r)
 {
     return !(l < r);
 }
