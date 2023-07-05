@@ -23,7 +23,7 @@ testCase(test_flat_set)
     ist::sbo_set<std::string, 8> bset;
 
     std::byte buf[sizeof(std::string) * 32];
-    ist::set_view<std::string> vset(buf, 32);
+    ist::mapped_set<std::string> vset(buf, 32);
 
     auto check = [&]() {
         testExpect(sset.size() == fset.size());
@@ -102,7 +102,7 @@ testCase(test_flat_map)
     ist::sbo_map<std::string, int, 8> bmap;
 
     std::byte buf[sizeof(std::pair<std::string, int>) * 32];
-    ist::map_view<std::string, int> vmap(buf, 32);
+    ist::mapped_map<std::string, int> vmap(buf, 32);
 
     auto check = [&]() {
         testExpect(smap.size() == fmap.size());
@@ -189,8 +189,8 @@ testCase(test_fixed_vector)
 {
     printf("is_memory_view_v<ist::fixed_vector<int, 8>>: %d\n",
         (int)ist::is_memory_view_v<ist::fixed_vector<int, 8>>);
-    printf("is_memory_view_v<ist::vector_view<int>>: %d\n",
-        (int)ist::is_memory_view_v<ist::vector_view<int>>);
+    printf("is_memory_view_v<ist::mapped_vector<int>>: %d\n",
+        (int)ist::is_memory_view_v<ist::mapped_vector<int>>);
 
     {
         // basic tests
@@ -199,7 +199,7 @@ testCase(test_fixed_vector)
         ist::vector<std::string> ddata;
 
         std::byte buf[sizeof(std::string) * 128];
-        ist::vector_view<std::string> vdata(buf, 128);
+        ist::mapped_vector<std::string> vdata(buf, 128);
 
         auto make_data = [](auto& dst) {
             std::string tmp;
@@ -342,7 +342,7 @@ testCase(test_fixed_raw_vector)
         ist::raw_vector<int> ddata;
 
         std::byte buf1[sizeof(int) * 128];
-        ist::raw_vector_view<int> vdata(buf1, 128);
+        ist::mapped_raw_vector<int> vdata(buf1, 128);
 
         auto make_data = [](auto& dst){
             int tmp = 0;

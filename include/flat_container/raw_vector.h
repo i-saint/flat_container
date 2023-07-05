@@ -4,9 +4,9 @@
 namespace ist {
 
 template<class T, class Memory>
-class basic_raw_vector : public Memory
+class basic_raw_vector : public memory_boilerplate<Memory>
 {
-using super = Memory;
+using super = memory_boilerplate<Memory>;
 public:
     // T must be pod
     static_assert(is_pod_v<T>);
@@ -184,7 +184,7 @@ template<class T, size_t Capacity>
 using sbo_raw_vector = basic_raw_vector<T, sbo_memory<T, Capacity>>;
 
 template<class T>
-using raw_vector_view = basic_raw_vector<T, memory_view<T>>;
+using mapped_raw_vector = basic_raw_vector<T, mapped_memory<T>>;
 
 } // namespace ist
 

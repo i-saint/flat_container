@@ -4,9 +4,9 @@
 namespace ist {
 
 template<class T, class Memory>
-class basic_vector : public Memory
+class basic_vector : public memory_boilerplate<Memory>
 {
-using super = Memory;
+using super = memory_boilerplate<Memory>;
 public:
     using typename super::iterator;
     using typename super::const_iterator;
@@ -190,7 +190,7 @@ template<class T, size_t Capacity>
 using sbo_vector = basic_vector<T, sbo_memory<T, Capacity>>;
 
 template<class T>
-using vector_view = basic_vector<T, memory_view<T>>;
+using mapped_vector = basic_vector<T, mapped_memory<T>>;
 
 } // namespace ist
 

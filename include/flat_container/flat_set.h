@@ -305,7 +305,7 @@ template <class Key, size_t Capacity, class Compare = std::less<>>
 using sbo_set = flat_set<Key, Compare, sbo_vector<Key, Capacity>>;
 
 template <class Key, class Compare = std::less<>>
-using set_view = flat_set<Key, Compare, vector_view<Key>>;
+using mapped_set = flat_set<Key, Compare, mapped_vector<Key>>;
 
 } // namespace ist
 

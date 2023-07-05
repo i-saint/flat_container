@@ -20,9 +20,9 @@ constexpr bool is_string_like_v<Container, Char, std::enable_if_t<
 
 
 template<class T, class Memory, class Traits = std::char_traits<T>>
-class basic_string : public Memory
+class basic_string : public memory_boilerplate<Memory>
 {
-using super = Memory;
+using super = memory_boilerplate<Memory>;
 public:
     using traits_type = Traits;
     using typename super::iterator;
@@ -609,6 +609,7 @@ protected:
     }
 };
 
+
 // operator +
 
 template<class T, class M, class Tr>
@@ -668,6 +669,7 @@ inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const String
     l += r;
     return l;
 }
+
 
 // operator ==, !=, <, <=, >, >=
 
@@ -769,31 +771,26 @@ using string = basic_string<char, dynamic_memory<char>, std::char_traits<char>>;
 using wstring = basic_string<wchar_t, dynamic_memory<wchar_t>, std::char_traits<wchar_t>>;
 using u16string = basic_string<char16_t, dynamic_memory<char16_t>, std::char_traits<char16_t>>;
 using u32string = basic_string<char32_t, dynamic_memory<char32_t>, std::char_traits<char32_t>>;
-#if __cpp_char8_t
-using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
-#endif // __cpp_char8_t
 
 template<size_t Capacity> using fixed_string = basic_string<char, fixed_memory<char, Capacity>, std::char_traits<char>>;
 template<size_t Capacity> using fixed_wstring = basic_string<wchar_t, fixed_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
 template<size_t Capacity> using fixed_u16string = basic_string<char16_t, fixed_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
 template<size_t Capacity> using fixed_u32string = basic_string<char32_t, fixed_memory<char, Capacity>, std::char_traits<char>>;
-#if __cpp_char8_t
-template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char, Capacity>, std::char_traits<char8_t>>;
-#endif // __cpp_char8_t
 
 template<size_t Capacity> using sbo_string = basic_string<char, sbo_memory<char, Capacity>, std::char_traits<char>>;
 template<size_t Capacity> using sbo_wstring = basic_string<wchar_t, sbo_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
 template<size_t Capacity> using sbo_u16string = basic_string<char16_t, sbo_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
 template<size_t Capacity> using sbo_u32string = basic_string<char32_t, sbo_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
-#if __cpp_char8_t
-template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-#endif // __cpp_char8_t
 
 using string_view = std::basic_string_view<char, std::char_traits<char>>;
 using wstring_view = std::basic_string_view<wchar_t, std::char_traits<wchar_t>>;
 using u16string_view = std::basic_string_view<char16_t, std::char_traits<char16_t>>;
 using u32string_view = std::basic_string_view<char32_t, std::char_traits<char32_t>>;
+
 #if __cpp_char8_t
+using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
+template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char, Capacity>, std::char_traits<char8_t>>;
+template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
 using u8string_view = std::basic_string_view<char8_t, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t
 

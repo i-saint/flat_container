@@ -358,7 +358,7 @@ template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
 using sbo_map = flat_map<Key, Value, Compare, sbo_vector<std::pair<Key, Value>, Capacity>>;
 
 template <class Key, class Value, class Compare = std::less<>>
-using map_view = flat_map<Key, Value, Compare, vector_view<std::pair<Key, Value>>>;
+using mapped_map = flat_map<Key, Value, Compare, mapped_vector<std::pair<Key, Value>>>;
 
 } // namespace ist
 
