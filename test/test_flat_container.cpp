@@ -14,16 +14,17 @@
 #endif
 
 using test::Timer;
+using string = ist::string;
 
 testCase(test_flat_set)
 {
-    std::set<std::string> sset;
-    ist::flat_set<std::string> fset;
-    ist::fixed_set<std::string, 32> xset;
-    ist::sbo_set<std::string, 8> bset;
+    std::set<string> sset;
+    ist::flat_set<string> fset;
+    ist::fixed_set<string, 32> xset;
+    ist::sbo_set<string, 8> bset;
 
-    std::byte buf[sizeof(std::string) * 32];
-    ist::mapped_set<std::string> vset(buf, 32);
+    std::byte buf[sizeof(string) * 32];
+    ist::mapped_set<string> vset(buf, 32);
 
     auto check = [&]() {
         testExpect(sset.size() == fset.size());
@@ -44,21 +45,21 @@ testCase(test_flat_set)
             ++i1; ++i2; ++i3; ++i4; ++i5;
         }
     };
-    auto insert = [&](const std::string& v) {
+    auto insert = [&](const string& v) {
         sset.insert(v);
         fset.insert(v);
         xset.insert(v);
         bset.insert(v);
         vset.insert(v);
     };
-    auto insert_il = [&](std::initializer_list<std::string>&& v) {
+    auto insert_il = [&](std::initializer_list<string>&& v) {
         sset.insert(v);
         fset.insert(v);
         xset.insert(v);
         bset.insert(v);
         vset.insert(v);
     };
-    auto erase = [&](const std::string& v) {
+    auto erase = [&](const string& v) {
         sset.erase(v);
         fset.erase(v);
         xset.erase(v);
@@ -66,7 +67,7 @@ testCase(test_flat_set)
         vset.erase(v);
     };
 
-    std::string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", };
+    string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", };
     for (auto& v : data) {
         insert(v);
     }
@@ -96,13 +97,13 @@ testCase(test_flat_set)
 
 testCase(test_flat_map)
 {
-    std::map<std::string, int> smap;
-    ist::flat_map<std::string, int> fmap;
-    ist::fixed_map<std::string, int, 32> xmap;
-    ist::sbo_map<std::string, int, 8> bmap;
+    std::map<string, int> smap;
+    ist::flat_map<string, int> fmap;
+    ist::fixed_map<string, int, 32> xmap;
+    ist::sbo_map<string, int, 8> bmap;
 
-    std::byte buf[sizeof(std::pair<std::string, int>) * 32];
-    ist::mapped_map<std::string, int> vmap(buf, 32);
+    std::byte buf[sizeof(std::pair<string, int>) * 32];
+    ist::mapped_map<string, int> vmap(buf, 32);
 
     auto check = [&]() {
         testExpect(smap.size() == fmap.size());
@@ -123,21 +124,21 @@ testCase(test_flat_map)
             ++i1; ++i2; ++i3; ++i4; ++i5;
         }
     };
-    auto insert = [&](const std::pair<std::string, int>& v) {
+    auto insert = [&](const std::pair<string, int>& v) {
         smap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
         bmap.insert(v);
         vmap.insert(v);
     };
-    auto insert_il = [&](std::initializer_list<std::pair<const std::string, int>>&& v) {
+    auto insert_il = [&](std::initializer_list<std::pair<const string, int>>&& v) {
         smap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
         bmap.insert(v);
         vmap.insert(v);
     };
-    auto erase = [&](const std::string& v) {
+    auto erase = [&](const string& v) {
         smap.erase(v);
         fmap.erase(v);
         xmap.erase(v);
@@ -145,7 +146,7 @@ testCase(test_flat_map)
         vmap.erase(v);
     };
 
-    std::pair<std::string, int> data[]{
+    std::pair<string, int> data[]{
         {"a", 10},
         {"c", 3},
         {"e", 50},
@@ -194,15 +195,15 @@ testCase(test_fixed_vector)
 
     {
         // basic tests
-        ist::fixed_vector<std::string, 128> data, data2, data3;
-        ist::sbo_vector<std::string, 32> sdata;
-        ist::vector<std::string> ddata;
+        ist::fixed_vector<string, 128> data, data2, data3;
+        ist::sbo_vector<string, 32> sdata;
+        ist::vector<string> ddata;
 
-        std::byte buf[sizeof(std::string) * 128];
-        ist::mapped_vector<std::string> vdata(buf, 128);
+        std::byte buf[sizeof(string) * 128];
+        ist::mapped_vector<string> vdata(buf, 128);
 
         auto make_data = [](auto& dst) {
-            std::string tmp;
+            string tmp;
             for (int i = 0; i < 64; ++i) {
                 tmp += ' ' + char(i);
 
@@ -217,7 +218,7 @@ testCase(test_fixed_vector)
                 case 3: dst.resize(dst.size() + 1, tmp); break;
                 case 4: dst.insert(dst.begin(), tmp); break;
                 case 5: dst.insert(dst.begin(), &tmp, &tmp + 1); break;
-                case 6: dst.insert(dst.begin(), std::initializer_list<std::string>{tmp}); break;
+                case 6: dst.insert(dst.begin(), std::initializer_list<string>{tmp}); break;
                 case 7: dst.erase(dst.begin() + dst.size() / 2); break;
                 case 8: dst.emplace(dst.begin() + dst.size() / 2, tmp.c_str(), tmp.size()); break;
                 }
@@ -278,7 +279,7 @@ testCase(test_fixed_vector)
         class elem
         {
         public:
-            elem(const std::string& v) : value(v) {}
+            elem(const string& v) : value(v) {}
             elem(const char* str, size_t len) : value(str, len) {}
             elem() = delete;
             elem(const elem&) = delete;
@@ -287,13 +288,13 @@ testCase(test_fixed_vector)
             elem& operator=(elem&&) = default;
             bool operator==(const elem& v) const { return value == v.value; }
 
-            std::string value;
+            string value;
         };
 
         ist::fixed_vector<elem, 128> data, data2, data3, data4;
         //std::vector<elem> data, data2, data3;
 
-        std::string tmp;
+        string tmp;
         for (int i = 0; i < 64; ++i) {
             tmp += ' ' + char(i);
 
@@ -333,7 +334,7 @@ testCase(test_fixed_vector)
 testCase(test_fixed_raw_vector)
 {
     // causes static assertion failure
-    //ist::fixed_raw_vector<std::string, 128> hoge;
+    //ist::fixed_raw_vector<string, 128> hoge;
 
     {
         // basic tests
@@ -424,10 +425,10 @@ testCase(test_fixed_raw_vector)
 testCase(test_constant_iterator)
 {
     {
-        using value_t = std::iterator_traits<ist::constant_iterator<std::string>>::value_type;
-        printf("%d\n", std::is_same_v<value_t, std::string> ? 1 : 0);
+        using value_t = std::iterator_traits<ist::constant_iterator<string>>::value_type;
+        printf("%d\n", std::is_same_v<value_t, string> ? 1 : 0);
 
-        std::string data = "abcdefg";
+        string data = "abcdefg";
 
         auto first = ist::make_constant_iterator(data);
         auto last = first + 4;

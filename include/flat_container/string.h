@@ -410,7 +410,7 @@ public:
 
     constexpr int compare(size_t pos1, size_t count1, const T* str, size_t pos2, size_t count2) const noexcept
     {
-        return Traits::compare(data() + pos1, str + pos2, std::max(count1, count2));
+        return Traits::compare(data() + pos1, str + pos2, std::min(count1, count2));
     }
     constexpr int compare(size_t pos1, size_t count1, const T* str) const noexcept
     {

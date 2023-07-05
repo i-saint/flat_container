@@ -45,6 +45,25 @@ template<typename T>
 constexpr bool is_pod_v = std::is_trivially_constructible_v<T> && std::is_trivially_copyable_v<T>;
 
 
+// std::construct_at() requires c++20 so define our own.
+template<class T, class... Args>
+inline constexpr T* _construct_at(T* p, Args&&... args)
+{
+    return new (p) T(std::forward<Args>(args)...);
+}
+// std::destroy, std::destroy_at is c++17 but define our own for consistency with construct_at.
+template<class T>
+inline constexpr void _destroy_at(T* p)
+{
+    std::destroy_at(p);
+}
+template<class Iter>
+inline constexpr void _destroy(const Iter first, const Iter last)
+{
+    std::destroy(first, last);
+}
+
+
 template<class T>
 class dynamic_memory
 {
@@ -52,8 +71,8 @@ public:
     using value_type = T;
     static const bool is_dynamic_memory = true;
 
-    dynamic_memory() = default;
-    ~dynamic_memory() { _release(); }
+    dynamic_memory() {}
+    ~dynamic_memory() { _deallocate(data_); }
 
     void reserve(size_t n)
     {
@@ -87,21 +106,14 @@ protected:
         }
         else {
             for (size_t i = 0; i < size_; ++i) {
-                new (new_data + i) T(std::move(data_[i]));
-                std::destroy_at(&data_[i]);
+                _construct_at<T>(&new_data[i], std::move(data_[i]));
+                _destroy_at(&data_[i]);
             }
         }
 
         _deallocate(data_);
-        capacity_ = new_capaity;
         data_ = new_data;
-    }
-
-    void _release()
-    {
-        _deallocate(data_);
-        capacity_ = size_ = 0;
-        data_ = nullptr;
+        capacity_ = new_capaity;
     }
 
     size_t capacity_ = 0;
@@ -118,8 +130,8 @@ public:
     static const bool is_sbo_memory = true;
     static const size_t fixed_capacity = Capacity;
 
-    sbo_memory() = default;
-    ~sbo_memory() { _release(); }
+    sbo_memory() {}
+    ~sbo_memory() { _deallocate(data_); }
 
     constexpr size_t buffer_capacity() noexcept { return buffer_capacity_; }
 
@@ -166,21 +178,14 @@ protected:
         }
         else {
             for (size_t i = 0; i < size_; ++i) {
-                new (new_data + i) T(std::move(data_[i]));
-                std::destroy_at(&data_[i]);
+                _construct_at<T>(new_data + i, std::move(data_[i]));
+                _destroy_at(&data_[i]);
             }
         }
 
         _deallocate(data_);
-        capacity_ = new_capaity;
         data_ = new_data;
-    }
-
-    void _release()
-    {
-        _deallocate(data_);
-        capacity_ = size_ = 0;
-        data_ = nullptr;
+        capacity_ = new_capaity;
     }
 
     static const size_t buffer_capacity_ = Capacity;
@@ -221,7 +226,7 @@ public:
     using value_type = T;
     static const bool is_memory_view = true;
 
-    mapped_memory() = default;
+    mapped_memory() {}
     mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
     ~mapped_memory() {}
 
@@ -355,7 +360,7 @@ protected:
                 *dst++ = *first++;
             }
             while (dst < end_new) {
-                new (dst++) value_type(*first++);
+                _construct_at<value_type>(dst++, *first++);
             }
         }
     }
@@ -374,7 +379,7 @@ protected:
                 *dst++ = v;
             }
             while (dst < end_new) {
-                new (dst++) value_type(v);
+                _construct_at<value_type>(dst++, v);
             }
         }
     }
@@ -392,7 +397,7 @@ protected:
                 *dst++ = std::move(*first++);
             }
             while (dst < end_new) {
-                new (dst++) value_type(std::move(*first++));
+                _construct_at<value_type>(dst++, std::move(*first++));
             }
         }
     }
@@ -403,7 +408,7 @@ protected:
         }
         else {
             if (dst >= this->data_ + this->size_) {
-                new (dst) value_type(std::move(v));
+                _construct_at<value_type>(dst, std::move(v));
             }
             else {
                 *dst = std::move(v);
@@ -418,7 +423,7 @@ protected:
         }
         else {
             if (dst >= this->data_ + this->size_) {
-                new (dst) value_type(std::forward<Args>(args)...);
+                _construct_at<value_type>(dst, std::forward<Args>(args)...);
             }
             else {
                 *dst = value_type(std::forward<Args>(args)...);
@@ -448,14 +453,14 @@ protected:
             }
             if (size1 < size2) {
                 for (size_t i = size1; i < size2; ++i) {
-                    new (this->data_ + i) value_type(std::move(r[i]));
-                    std::destroy_at(&r[i]);
+                    _construct_at<value_type>(this->data_ + i, std::move(r[i]));
+                    _destroy_at(&r[i]);
                 }
             }
             if (size2 < size1) {
                 for (size_t i = size2; i < size1; ++i) {
-                    new (r.data_ + i) value_type(std::move(this->data_[i]));
-                    std::destroy_at(&this->data_[i]);
+                    _construct_at<value_type>(r.data_ + i, std::move(this->data_[i]));
+                    _destroy_at(&this->data_[i]);
                 }
             }
             std::swap(this->size_, r.size_);
@@ -470,7 +475,7 @@ protected:
         construct(this->data_);
         if constexpr (!is_pod_v<value_type>) {
             if (n < this->size_) {
-                std::destroy(this->data_ + n, this->data_ + this->size_);
+                _destroy(this->data_ + n, this->data_ + this->size_);
             }
         }
         this->size_ = n;
@@ -481,7 +486,7 @@ protected:
         size_t new_size = this->size_ - n;
         _capacity_check(new_size);
         if constexpr (!is_pod_v<value_type>) {
-            std::destroy(this->data_ + new_size, this->data_ + this->size_);
+            _destroy(this->data_ + new_size, this->data_ + this->size_);
         }
         this->size_ = new_size;
     }
@@ -540,7 +545,7 @@ protected:
             value_type* end_new = this->data_ + this->size_;
             value_type* end_assign = dst - n;
             while (dst > end_new) {
-                new (--dst) value_type(std::move(*(--last)));
+                _construct_at<value_type>(--dst, std::move(*(--last)));
             }
             while (dst > end_assign) {
                 *(--dst) = std::move(*(--last));
