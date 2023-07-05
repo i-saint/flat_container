@@ -74,45 +74,28 @@ public:
     using value_type = T;
     static const bool is_dynamic_memory = true;
 
-    dynamic_memory() {}
-    ~dynamic_memory() { _deallocate(data_); }
-
-    void reserve(size_t n)
-    {
-        if (n <= capacity_) {
-            return;
-        }
-        size_t new_capaity = std::max<size_t>(n, capacity_ * 2);
-        _reallocate(new_capaity);
-    }
-
-    void shrink_to_fit()
-    {
-        _reallocate(size_);
-    }
-
 protected:
     T* _allocate(size_t size)
     {
+        if (size == 0) {
+            return nullptr;
+        }
         return (T*)std::malloc(sizeof(T) * size);
     }
+
     void _deallocate(void *addr)
     {
         std::free(addr);
     }
 
-    void _reallocate(size_t new_capaity)
+    template<class Move>
+    void _reallocate(size_t new_capaity, Move&& move)
     {
+        if (capacity_ == new_capaity) {
+            return;
+        }
         T* new_data = _allocate(new_capaity);
-        if constexpr (is_pod_v<T>) {
-            std::memcpy(new_data, data_, sizeof(T) * size_);
-        }
-        else {
-            for (size_t i = 0; i < size_; ++i) {
-                _construct_at<T>(&new_data[i], std::move(data_[i]));
-                _destroy_at(&data_[i]);
-            }
-        }
+        move(new_data);
 
         _deallocate(data_);
         data_ = new_data;
@@ -133,24 +116,7 @@ public:
     static const bool is_sbo_memory = true;
     static const size_t fixed_capacity = Capacity;
 
-    sbo_memory() {}
-    ~sbo_memory() { _deallocate(data_); }
-
     constexpr size_t buffer_capacity() noexcept { return buffer_capacity_; }
-
-    void reserve(size_t n)
-    {
-        if (n <= capacity_) {
-            return;
-        }
-        size_t new_capaity = std::max<size_t>(n, capacity_ * 2);
-        _reallocate(new_capaity);
-    }
-
-    void shrink_to_fit()
-    {
-        _reallocate(size_);
-    }
 
 protected:
     T* _allocate(size_t size)
@@ -162,6 +128,7 @@ protected:
             return (T*)std::malloc(sizeof(T) * size);
         }
     }
+
     void _deallocate(void* addr)
     {
         if (addr != buffer_) {
@@ -169,22 +136,17 @@ protected:
         }
     }
 
-    void _reallocate(size_t new_capaity)
+    template<class Move>
+    void _reallocate(size_t new_capaity, Move&& move)
     {
+        if (capacity_ == new_capaity) {
+            return;
+        }
         T* new_data = _allocate(new_capaity);
         if (new_data == data_) {
             return;
         }
-
-        if constexpr (is_pod_v<T>) {
-            std::memcpy(new_data, data_, sizeof(T) * size_);
-        }
-        else {
-            for (size_t i = 0; i < size_; ++i) {
-                _construct_at<T>(new_data + i, std::move(data_[i]));
-                _destroy_at(&data_[i]);
-            }
-        }
+        move(new_data);
 
         _deallocate(data_);
         data_ = new_data;
@@ -209,9 +171,6 @@ public:
     fixed_memory() {}
     ~fixed_memory() {}
 
-    constexpr void reserve(size_t n) {}
-    constexpr void shrink_to_fit() {}
-
 protected:
     static const size_t capacity_ = Capacity;
     size_t size_ = 0;
@@ -231,9 +190,6 @@ public:
     mapped_memory() {}
     mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
     ~mapped_memory() {}
-
-    constexpr void reserve(size_t n) {}
-    constexpr void shrink_to_fit() {}
 
     // detach data from this view.
     // (if detach() or swap() are not called, elements are destroyed by destrunctor)
@@ -272,7 +228,11 @@ public:
         : super(data, capacity, size)
     {
     }
-    ~memory_boilerplate() { clear(); }
+    ~memory_boilerplate()
+    {
+        clear();
+        shrink_to_fit();
+    }
 
     memory_boilerplate& operator=(const memory_boilerplate& r)
     {
@@ -304,6 +264,24 @@ public:
         }
         else if constexpr (super::is_fixed_memory) {
             this->_swap_content(r);
+        }
+    }
+
+    void reserve(size_t n)
+    {
+        if constexpr (is_dynamic_memory_v<super> || is_sbo_memory_v<super>) {
+            if (n <= this->capacity_) {
+                return;
+            }
+            size_t new_capaity = std::max<size_t>(n, this->capacity_ * 2);
+            _resize_capacity(new_capaity);
+        }
+    }
+
+    void shrink_to_fit()
+    {
+        if constexpr (is_dynamic_memory_v<super> || is_mapped_memory_v<super>) {
+            _resize_capacity(this->size_);
         }
     }
 
@@ -342,6 +320,24 @@ public:
 #endif
 
 protected:
+    void _resize_capacity(size_t new_capaity)
+    {
+        if constexpr (is_dynamic_memory_v<super> || is_sbo_memory_v<super>) {
+            this->_reallocate(new_capaity, [&](pointer new_data) {
+                size_t size_move = new_capaity; // new_capacity is always >= this->size_
+                if constexpr (is_pod_v<value_type>) {
+                    std::memcpy(new_data, this->data_, sizeof(value_type) * size_move);
+                }
+                else {
+                    for (size_t i = 0; i < size_move; ++i) {
+                        _construct_at<value_type>(new_data + i, std::move(this->data_[i]));
+                        _destroy_at(&this->data_[i]);
+                    }
+                }
+                });
+        }
+    }
+
     template<class Iter>
     constexpr void _copy_range(iterator dst, Iter first, Iter last)
     {

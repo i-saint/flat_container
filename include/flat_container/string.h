@@ -469,14 +469,14 @@ public:
     template<class Number, fc_require(std::is_integral_v<Number>)>
     inline Number to_number(size_t* idx, int base) const
     {
-        auto start = begin();
+        auto first = begin();
         auto last = end();
-        while (std::isspace(*start)) {
-            ++start;
+        while (std::isspace(*first)) {
+            ++first;
         }
 
         Number tmp;
-        auto res = std::from_chars(start, last, tmp, base);
+        auto res = std::from_chars(first, last, tmp, base);
         if (res.ec == std::errc{}) {
             if (idx) {
                 *idx = std::distance(begin(), res.ptr);
@@ -492,17 +492,17 @@ public:
     template<class Number, fc_require(std::is_floating_point_v<Number>)>
     inline Number to_number(size_t* idx) const
     {
-        auto start = begin();
+        auto first = begin();
         auto last = end();
-        while (std::isspace(*start)) {
-            ++start;
+        while (std::isspace(*first)) {
+            ++first;
         }
 
         // note: std::from_chars with floating point types are not implementen on emscripten (as of 2023/07).
         // in that case, fallback to std::atof(). so, 0.0 is returned on error instead of throwing std::invalid_argument.
         if constexpr (is_from_chars_available_v<Number>) {
             Number tmp;
-            auto res = std::from_chars(start, last, tmp);
+            auto res = std::from_chars(first, last, tmp);
             if (res.ec == std::errc{}) {
                 if (idx) {
                     *idx = std::distance(begin(), res.ptr);
@@ -515,7 +515,7 @@ public:
             }
         }
         else {
-            return std::atof(start);
+            return std::atof(first);
         }
     }
 
