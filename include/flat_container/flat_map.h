@@ -37,18 +37,18 @@ public:
     flat_map(const container_type& v) { operator=(v); }
     flat_map(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool view = is_memory_view_v<container_type>, fc_require(!view), fc_require(is_iterator_v<Iter>)>
+    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
     flat_map(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool view = is_memory_view_v<container_type>, fc_require(!view)>
+    template <bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped)>
     flat_map(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool view = is_memory_view_v<container_type>, fc_require(view)>
+    template<bool mapped = is_mapped_memory_v<container_type>, fc_require(mapped)>
     flat_map(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {

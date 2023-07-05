@@ -188,10 +188,10 @@ testCase(test_flat_map)
 
 testCase(test_fixed_vector)
 {
-    printf("is_memory_view_v<ist::fixed_vector<int, 8>>: %d\n",
-        (int)ist::is_memory_view_v<ist::fixed_vector<int, 8>>);
-    printf("is_memory_view_v<ist::mapped_vector<int>>: %d\n",
-        (int)ist::is_memory_view_v<ist::mapped_vector<int>>);
+    printf("is_mapped_memory_v<ist::fixed_vector<int, 8>>: %d\n",
+        (int)ist::is_mapped_memory_v<ist::fixed_vector<int, 8>>);
+    printf("is_mapped_memory_v<ist::mapped_vector<int>>: %d\n",
+        (int)ist::is_mapped_memory_v<ist::mapped_vector<int>>);
 
     {
         // basic tests

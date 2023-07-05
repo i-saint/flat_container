@@ -41,24 +41,24 @@ public:
     constexpr basic_string& operator=(const basic_string& r) = default;
     constexpr basic_string& operator=(basic_string&& r) noexcept = default;
 
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_string(size_t n, T ch) { assign(n, ch); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_string(const T* v) { assign(v); }
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_string(const T* v, size_t n) { assign(v, n); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_string(std::initializer_list<T> r) { assign(r); }
 
-    template<class Iter, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_iterator_v<Iter>)>
+    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
-    template<class String, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_string_like_v<String, T>)>
+    template<class String, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_string_like_v<String, T>)>
     constexpr basic_string(const String& str) { assign(str); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(view)>
+    template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
     constexpr basic_string(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
         , basic_string()

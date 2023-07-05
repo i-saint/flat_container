@@ -5,6 +5,9 @@
 #include <iterator>
 #include <type_traits>
 #include <memory>
+#if __cpp_lib_span
+#   include <span>
+#endif
 
 #ifdef _DEBUG
 #   if !defined(FC_ENABLE_CAPACITY_CHECK)
@@ -32,9 +35,9 @@ template <typename T>
 constexpr bool is_fixed_memory_v<T, std::enable_if_t<T::is_fixed_memory>> = true;
 
 template <typename T, typename = void>
-constexpr bool is_memory_view_v = false;
+constexpr bool is_mapped_memory_v = false;
 template <typename T>
-constexpr bool is_memory_view_v<T, std::enable_if_t<T::is_memory_view>> = true;
+constexpr bool is_mapped_memory_v<T, std::enable_if_t<T::is_mapped_memory>> = true;
 
 template<typename T, typename = void>
 constexpr bool is_iterator_v = false;
@@ -42,7 +45,7 @@ template<typename T>
 constexpr bool is_iterator_v<T, typename std::enable_if_t<!std::is_same_v<typename std::iterator_traits<T>::value_type, void>>> = true;
 
 template<typename T>
-constexpr bool is_pod_v = std::is_trivially_constructible_v<T> && std::is_trivially_copyable_v<T>;
+constexpr bool is_pod_v = std::is_trivial_v<T>;
 
 
 // std::construct_at() requires c++20 so define our own.
@@ -221,10 +224,9 @@ protected:
 template<class T>
 class mapped_memory
 {
-template<class X> friend class memory_boilerplate;
 public:
     using value_type = T;
-    static const bool is_memory_view = true;
+    static const bool is_mapped_memory = true;
 
     mapped_memory() {}
     mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
@@ -265,7 +267,7 @@ public:
     memory_boilerplate() {}
     memory_boilerplate(const memory_boilerplate& r) { operator=(r); }
     memory_boilerplate(memory_boilerplate&& r) noexcept { operator=(std::move(r)); }
-    template<bool view = is_memory_view_v<super>, fc_require(view)>
+    template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
     constexpr memory_boilerplate(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
@@ -274,15 +276,7 @@ public:
 
     memory_boilerplate& operator=(const memory_boilerplate& r)
     {
-        if constexpr (is_memory_view_v<super>) {
-            this->capacity_ = r.capacity_;
-            this->size_ = r.size_;
-            this->data_ = r.data_;
-            return *this;
-        }
-        else {
-            _assign(r.size(), [&](pointer dst) { _copy_range(dst, r.begin(), r.end()); });
-        }
+        _assign(r.size(), [&](pointer dst) { _copy_range(dst, r.begin(), r.end()); });
         return *this;
     }
     memory_boilerplate& operator=(memory_boilerplate&& r)
@@ -293,7 +287,7 @@ public:
 
     constexpr void swap(memory_boilerplate& r)
     {
-        if constexpr (is_dynamic_memory_v<super> || is_memory_view_v<super>) {
+        if constexpr (is_dynamic_memory_v<super> || is_mapped_memory_v<super>) {
             std::swap(this->capacity_, r.capacity_);
             std::swap(this->size_, r.size_);
             std::swap(this->data_, r.data_);
@@ -318,7 +312,7 @@ public:
         _shrink(this->size_);
     }
 
-    constexpr size_t capacity() noexcept { return this->capacity_; }
+    constexpr size_t capacity() const noexcept { return this->capacity_; }
     constexpr size_t size() const noexcept { return this->size_; }
     constexpr size_t size_bytes() const noexcept { return sizeof(value_type) * this->size_; }
     constexpr pointer data() noexcept { return this->data_; }
@@ -339,6 +333,13 @@ public:
     constexpr const_reference front() const { _boundary_check(1); return this->data_[0]; }
     constexpr reference back() { _boundary_check(1); return this->data_[this->size_ - 1]; }
     constexpr const_reference back() const { _boundary_check(1); return this->data_[this->size_ - 1]; }
+
+#if __cpp_lib_span
+    constexpr operator std::span<T>() const noexcept
+    {
+        return { data(), size() };
+    }
+#endif
 
 protected:
     template<class Iter>
@@ -536,14 +537,14 @@ protected:
             return dst;
         }
         if constexpr (is_pod_v<value_type>) {
-            value_type* end_assign = dst - n;
+            auto end_assign = dst - n;
             while (dst > end_assign) {
                 *(--dst) = *(--last);
             }
         }
         else {
-            value_type* end_new = this->data_ + this->size_;
-            value_type* end_assign = dst - n;
+            auto end_new = this->data_ + this->size_;
+            auto end_assign = dst - n;
             while (dst > end_new) {
                 _construct_at<value_type>(--dst, std::move(*(--last)));
             }
