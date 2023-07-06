@@ -3,7 +3,7 @@
 #include <string_view>
 #include <charconv>
 #include <iterator>
-#include "foundation.h"
+#include "vector_base.h"
 
 namespace ist {
 
@@ -20,11 +20,16 @@ constexpr bool is_string_like_v<Container, Char, std::enable_if_t<
 
 
 template<class T, class Memory, class Traits = std::char_traits<T>>
-class basic_string : public memory_boilerplate<Memory>
+class basic_string : public vector_base<Memory>
 {
-using super = memory_boilerplate<Memory>;
+using super = vector_base<Memory>;
 public:
     using traits_type = Traits;
+    using typename super::value_type;
+    using typename super::pointer;
+    using typename super::const_pointer;
+    using typename super::reference;
+    using typename super::const_reference;
     using typename super::iterator;
     using typename super::const_iterator;
 
@@ -42,20 +47,20 @@ public:
     constexpr basic_string& operator=(basic_string&& r) noexcept = default;
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
-    constexpr basic_string(size_t n, T ch) { assign(n, ch); }
+    constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
-    constexpr basic_string(const T* v) { assign(v); }
+    constexpr basic_string(const_pointer v) { assign(v); }
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
-    constexpr basic_string(const T* v, size_t n) { assign(v, n); }
+    constexpr basic_string(const_pointer v, size_t n) { assign(v, n); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
-    constexpr basic_string(std::initializer_list<T> r) { assign(r); }
+    constexpr basic_string(std::initializer_list<value_type> r) { assign(r); }
 
     template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
-    template<class String, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_string_like_v<String, T>)>
+    template<class String, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string(const String& str) { assign(str); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
@@ -83,23 +88,23 @@ public:
     using super::front;
     using super::back;
 
-    constexpr const T* c_str() const { return data(); }
+    constexpr const_pointer c_str() const { return data(); }
     constexpr size_t length() const { return size(); }
 
     constexpr void resize(size_t n)
     {
-        _resize(n, [&](T*) {}); // new elements are uninitialized
+        _resize(n, [&](pointer) {}); // new elements are uninitialized
         _null_terminate();
     }
-    constexpr void resize(size_t n, T v)
+    constexpr void resize(size_t n, value_type v)
     {
-        _resize(n, [&](T* addr) { *addr = v; });
+        _resize(n, [&](pointer addr) { *addr = v; });
         _null_terminate();
     }
 
-    constexpr void push_back(const T& v)
+    constexpr void push_back(const_reference v)
     {
-        _expand(1, [&](T* addr) { *addr = v; });
+        _expand(1, [&](pointer addr) { *addr = v; });
         _null_terminate();
     }
 
@@ -112,25 +117,25 @@ public:
 
     // assign
 
-    constexpr basic_string& assign(const T* str, size_t n)
+    constexpr basic_string& assign(const_pointer str, size_t n)
     {
-        _assign(n, [&](T* dst) { _copy_range(dst, str, str + n); });
+        _assign(n, [&](pointer dst) { _copy_range(dst, str, str + n); });
         _null_terminate();
         return *this;
     }
-    constexpr basic_string& assign(const T* str)
+    constexpr basic_string& assign(const_pointer str)
     {
         return assign(str, Traits::length(str));
     }
-    constexpr basic_string& assign(size_t n, T ch)
+    constexpr basic_string& assign(size_t n, value_type ch)
     {
-        _assign(n, [&](T* dst) { _copy_n(dst, ch, n); });
+        _assign(n, [&](pointer dst) { _copy_n(dst, ch, n); });
         _null_terminate();
         return *this;
     }
-    constexpr basic_string& assign(std::initializer_list<T> list)
+    constexpr basic_string& assign(std::initializer_list<value_type> list)
     {
-        _assign(list.size(), [&](T* dst) { _copy_range(dst, list.begin(), list.end()); });
+        _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
         _null_terminate();
         return *this;
     }
@@ -138,11 +143,11 @@ public:
     constexpr basic_string& assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        _assign(n, [&](T* dst) { _copy_range(dst, first, last); });
+        _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
         _null_terminate();
         return *this;
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& assign(const String& str, size_t offset, size_t count = npos)
     {
         size_t n = count == npos ? str.size() - offset : count;
@@ -150,7 +155,7 @@ public:
         auto last = str.begin() + offset + n;
         return assign(first, last);
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& assign(const String& str)
     {
         return assign(str, 0, npos);
@@ -159,23 +164,23 @@ public:
 
     // insert
 
-    constexpr iterator insert(iterator pos, T* str, size_t n)
+    constexpr iterator insert(iterator pos, pointer str, size_t n)
     {
-        auto r = _insert(pos, n, [&](T* addr) { _copy_range(addr, str, str + n); });
+        auto r = _insert(pos, n, [&](pointer addr) { _copy_range(addr, str, str + n); });
         _null_terminate();
         return r;
     }
-    constexpr iterator insert(iterator pos, T* str)
+    constexpr iterator insert(iterator pos, pointer str)
     {
         return insert(pos, str, Traits::length(str));
     }
-    constexpr iterator insert(iterator pos, T ch)
+    constexpr iterator insert(iterator pos, value_type ch)
     {
         return insert(pos, &ch, 1);
     }
-    constexpr iterator insert(iterator pos, size_t n, T v)
+    constexpr iterator insert(iterator pos, size_t n, value_type v)
     {
-        auto r = _insert(pos, n, [&](T* addr) { _copy_n(addr, v, n); });
+        auto r = _insert(pos, n, [&](pointer addr) { _copy_n(addr, v, n); });
         _null_terminate();
         return r;
     }
@@ -183,35 +188,35 @@ public:
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        auto r = _insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
+        auto r = _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
         _null_terminate();
         return r;
     }
-    constexpr iterator insert(iterator pos, std::initializer_list<T> list)
+    constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
-        auto r = _insert(pos, list.size(), [&](T* addr) { _copy_range(addr, list.begin(), list.end()); });
+        auto r = _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
         _null_terminate();
         return r;
     }
 
-    constexpr basic_string& insert(size_t pos, const T* str, size_t offset, size_t count = npos)
+    constexpr basic_string& insert(size_t pos, const_pointer str, size_t offset, size_t count = npos)
     {
         size_t n = count == npos ? Traits::length(str) - offset : count;
         auto first = str;
         auto last = str + n;
-        _insert(begin() + pos, n, [&](T* addr) { _copy_range(addr, first, last); });
+        _insert(begin() + pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
         _null_terminate();
         return *this;
     }
-    constexpr basic_string& insert(size_t pos, const T* str)
+    constexpr basic_string& insert(size_t pos, const_pointer str)
     {
         return insert(pos, str, 0, Traits::length(str));
     }
-    constexpr basic_string& insert(size_t pos, size_t count, T ch)
+    constexpr basic_string& insert(size_t pos, size_t count, value_type ch)
     {
         return insert(pos, &ch, 0, 1);
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& insert(size_t pos, const String& str, size_t offset, size_t count = npos)
     {
         size_t n = count == npos ? str.size() - offset : count;
@@ -220,7 +225,7 @@ public:
         insert(begin() + pos, first, last);
         return *this;
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& insert(size_t pos, const String& str)
     {
         return insert(pos, str, 0, npos);
@@ -229,15 +234,15 @@ public:
 
     // append
 
-    constexpr basic_string& append(const T* str, size_t count)
+    constexpr basic_string& append(const_pointer str, size_t count)
     {
         return insert(size(), str, 0, count);
     }
-    constexpr basic_string& append(const T* str)
+    constexpr basic_string& append(const_pointer str)
     {
         return insert(size(), str);
     }
-    constexpr basic_string& append(T ch)
+    constexpr basic_string& append(value_type ch)
     {
         return insert(size(), 1, ch);
     }
@@ -247,26 +252,26 @@ public:
         insert(end(), first, last);
         return *this;
     }
-    constexpr basic_string& append(std::initializer_list<T> list)
+    constexpr basic_string& append(std::initializer_list<value_type> list)
     {
         insert(end(), list.begin(), list.end());
         return *this;
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& append(const String& str)
     {
         return insert(size(), str);
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& append(const String& str, size_t offset, size_t count = npos)
     {
         return insert(size(), str, offset, count);
     }
 
-    constexpr basic_string& operator+=(T ch) { return append(ch); }
-    constexpr basic_string& operator+=(const T* str) { return append(str); }
-    constexpr basic_string& operator+=(std::initializer_list<T> list) { return append(list); }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    constexpr basic_string& operator+=(value_type ch) { return append(ch); }
+    constexpr basic_string& operator+=(const_pointer str) { return append(str); }
+    constexpr basic_string& operator+=(std::initializer_list<value_type> list) { return append(list); }
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& operator+=(const String& str) { return append(str); }
 
 
@@ -299,38 +304,38 @@ public:
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
     {
         size_t count = std::distance(first2, last2);
-        return _replace(first, last, count, [&](T* addr) { _copy_range(addr, first2, last2); });
+        return _replace(first, last, count, [&](pointer addr) { _copy_range(addr, first2, last2); });
     }
-    constexpr basic_string& replace(iterator first, iterator last, const T* str, size_t count)
+    constexpr basic_string& replace(iterator first, iterator last, const_pointer str, size_t count)
     {
         return replace(first, last, str, str + count);
     }
-    constexpr basic_string& replace(iterator first, iterator last, const T* str)
+    constexpr basic_string& replace(iterator first, iterator last, const_pointer str)
     {
         return replace(first, last, str, str + Traits::length(str));
     }
-    constexpr basic_string& replace(iterator first, iterator last, size_t count, T ch)
+    constexpr basic_string& replace(iterator first, iterator last, size_t count, value_type ch)
     {
-        return _replace(first, last, count, [&](T* addr) { _copy_n(addr, ch, count); });
+        return _replace(first, last, count, [&](pointer addr) { _copy_n(addr, ch, count); });
     }
 
-    constexpr basic_string& replace(size_t pos, size_t count, const T* str, size_t count2)
+    constexpr basic_string& replace(size_t pos, size_t count, const_pointer str, size_t count2)
     {
         auto first = begin() + pos;
         auto last = begin() + pos + count;
         return replace(first, last, str, str + count2);
     }
-    constexpr basic_string& replace(size_t pos, size_t count, const T* str)
+    constexpr basic_string& replace(size_t pos, size_t count, const_pointer str)
     {
         return replace(pos, count, str, Traits::length(str));
     }
-    constexpr basic_string& replace(size_t pos, size_t count, std::initializer_list<T> list)
+    constexpr basic_string& replace(size_t pos, size_t count, std::initializer_list<value_type> list)
     {
         auto first = begin() + pos;
         auto last = begin() + pos + count;
         return replace(first, last, list.begin(), list.end());
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& replace(size_t pos, size_t count, const String& str, size_t pos2, size_t count2 = npos)
     {
         auto first = begin() + pos;
@@ -340,7 +345,7 @@ public:
         auto last2 = str.begin() + pos2 + n;
         return replace(first, last, first2, last2);
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& replace(size_t pos, size_t count, const String& str)
     {
         return replace(pos, count, str, 0, str.size());
@@ -349,19 +354,19 @@ public:
 
     // find
 
-    constexpr size_t find(const T* str, size_t pos, size_t count) const noexcept
+    constexpr size_t find(const_pointer str, size_t pos, size_t count) const noexcept
     {
         return _find_str(str, count, pos);
     }
-    constexpr size_t find(const T* str, size_t pos = 0) const noexcept
+    constexpr size_t find(const_pointer str, size_t pos = 0) const noexcept
     {
         return _find_str(str, Traits::length(str), pos);
     }
-    constexpr size_t find(T ch, size_t pos = 0) const noexcept
+    constexpr size_t find(value_type ch, size_t pos = 0) const noexcept
     {
         return _find_ch(ch, pos);
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr size_t find(const String& str, size_t pos = 0) const noexcept
     {
         return _find_str(str.data(), str.size(), pos);
@@ -370,16 +375,16 @@ public:
 
     // starts_with
 
-    constexpr bool starts_with(T ch) const noexcept
+    constexpr bool starts_with(value_type ch) const noexcept
     {
         return size() >= 1 && Traits::compare(data(), &ch, 1) == 0;
     }
-    constexpr bool starts_with(const T* str) const noexcept
+    constexpr bool starts_with(const_pointer str) const noexcept
     {
         size_t n = Traits::length(str);
         return size() >= n && Traits::compare(data(), str, n) == 0;
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr bool starts_with(const String& str) const noexcept
     {
         size_t n = str.size();
@@ -389,16 +394,16 @@ public:
 
     // ends_with
 
-    constexpr bool ends_with(T ch) const noexcept
+    constexpr bool ends_with(value_type ch) const noexcept
     {
         return size() >= 1 && Traits::compare(data() + size() - 1, &ch, 1) == 0;
     }
-    constexpr bool ends_with(const T* str) const noexcept
+    constexpr bool ends_with(const_pointer str) const noexcept
     {
         size_t n = Traits::length(str);
         return size() >= n && Traits::compare(data() + size() - n, str, n) == 0;
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr bool ends_with(const String& str) const noexcept
     {
         size_t n = str.size();
@@ -408,31 +413,31 @@ public:
 
     // compare
 
-    constexpr int compare(size_t pos1, size_t count1, const T* str, size_t pos2, size_t count2) const noexcept
+    constexpr int compare(size_t pos1, size_t count1, const_pointer str, size_t pos2, size_t count2) const noexcept
     {
         return Traits::compare(data() + pos1, str + pos2, std::min(count1, count2));
     }
-    constexpr int compare(size_t pos1, size_t count1, const T* str) const noexcept
+    constexpr int compare(size_t pos1, size_t count1, const_pointer str) const noexcept
     {
         return compare(pos1, count1, str, 0, Traits::length(str));
     }
-    constexpr int compare(const T* str) const noexcept
+    constexpr int compare(const_pointer str) const noexcept
     {
         return compare(0, size(), str, 0, Traits::length(str));
     }
 
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr int compare(size_t pos1, size_t count1, const String& str, size_t pos2, size_t count2 = npos) const noexcept
     {
         count2 = count2 == npos ? str.size() - pos2 : count2;
         return compare(pos1, count1, str.data(), pos2, count2);
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr int compare(size_t pos1, size_t count1, const String& str) const noexcept
     {
         return compare(pos1, count1, str, 0, str.size());
     }
-    template<class String, fc_require(is_string_like_v<String, T>)>
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr int compare(const String& str) const noexcept
     {
         return compare(0, size(), str, 0, str.size());
@@ -450,7 +455,7 @@ public:
 
     // copy
 
-    constexpr size_t copy(T* dest, size_t count, size_t pos = 0)
+    constexpr size_t copy(pointer dest, size_t count, size_t pos = 0)
     {
         count = count == npos ? size() - pos : count;
         Traits::copy(dest, data() + pos, count);
@@ -460,7 +465,7 @@ public:
 
     // std::string_view
 
-    constexpr operator std::basic_string_view<T, Traits>() const noexcept
+    constexpr operator std::basic_string_view<value_type, Traits>() const noexcept
     {
         return { data(), size() };
     }
@@ -544,9 +549,9 @@ protected:
         data()[size()] = 0;
     }
 
-    constexpr size_t _find_ch(T ch, size_t offset) const noexcept
+    constexpr size_t _find_ch(value_type ch, size_t offset) const noexcept
     {
-        const T* str1 = data();
+        const_pointer str1 = data();
         const size_t size1 = size();
         if (offset < size1) {
             const auto found = Traits::find(str1 + offset, size1 - offset, ch);
@@ -556,9 +561,9 @@ protected:
         }
         return static_cast<size_t>(-1);
     }
-    constexpr size_t _find_str(const T* str2, size_t size2, size_t offset) const noexcept
+    constexpr size_t _find_str(const_pointer str2, size_t size2, size_t offset) const noexcept
     {
-        const T* str1 = data();
+        const_pointer str1 = data();
         const size_t size1 = size();
         if (size2 > size1 || offset > size1 - size2) {
             return static_cast<size_t>(-1);
@@ -588,7 +593,7 @@ protected:
             erase(first, first + (del_count - n));
         }
         else if (del_count < n) {
-            insert(first, n - del_count, T(0));
+            insert(first, n - del_count, value_type(0));
         }
         // data_ changes if insert() causes allocation. in that case, first is no longer valid.
         do_copy(begin() + d);
