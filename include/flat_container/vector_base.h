@@ -4,14 +4,6 @@
 
 namespace ist {
 
-template<typename T, typename = void>
-constexpr bool is_iterator_v = false;
-template<typename T>
-constexpr bool is_iterator_v<T, typename std::enable_if_t<!std::is_same_v<typename std::iterator_traits<T>::value_type, void>>> = true;
-
-template<typename T>
-constexpr bool is_pod_v = std::is_trivial_v<T>;
-
 
 // std::construct_at() requires c++20 so define our own.
 template<class T, class... Args>
@@ -162,7 +154,7 @@ protected:
         }
     }
 
-    template<class Iter>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr void _copy_range(iterator dst, Iter first, Iter last)
     {
         if constexpr (is_pod_v<value_type>) {

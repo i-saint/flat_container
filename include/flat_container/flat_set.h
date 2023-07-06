@@ -12,7 +12,7 @@ template <
     class Compare = std::less<>,
     class Container = std::vector<Key, std::allocator<Key>>
 >
-class flat_set
+class basic_set
 {
 public:
     using key_type               = Key;
@@ -30,52 +30,52 @@ public:
     using const_iterator         = typename container_type::const_iterator;
 
 
-    flat_set() {}
-    flat_set(const flat_set& v) { operator=(v); }
-    flat_set(flat_set&& v) noexcept { operator=(std::move(v)); }
-    flat_set(const container_type& v) { operator=(v); }
-    flat_set(container_type&& v) noexcept { operator=(std::move(v)); }
+    basic_set() {}
+    basic_set(const basic_set& v) { operator=(v); }
+    basic_set(basic_set&& v) noexcept { operator=(std::move(v)); }
+    basic_set(const container_type& v) { operator=(v); }
+    basic_set(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
-    flat_set(Iter first, Iter last)
+    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    basic_set(Iter first, Iter last)
     {
         insert(first, last);
     }
     template <bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped)>
-    flat_set(std::initializer_list<value_type> list)
+    basic_set(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
     template<bool mapped = is_mapped_memory_v<container_type>, fc_require(mapped)>
-    flat_set(void* data, size_t capacity, size_t size = 0)
+    basic_set(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
     }
 
-    flat_set& operator=(const flat_set& v)
+    basic_set& operator=(const basic_set& v)
     {
         data_ = v.data_;
         return *this;
     }
-    flat_set& operator=(flat_set&& v) noexcept
+    basic_set& operator=(basic_set&& v) noexcept
     {
         swap(v);
         return *this;
     }
-    flat_set& operator=(const container_type& v)
+    basic_set& operator=(const container_type& v)
     {
         data_ = v.data_;
         sort();
         return *this;
     }
-    flat_set& operator=(container_type&& v) noexcept
+    basic_set& operator=(container_type&& v) noexcept
     {
         swap(v);
         return *this;
     }
 
-    void swap(flat_set& v) noexcept
+    void swap(basic_set& v) noexcept
     {
         data_.swap(v.data_);
     }
@@ -88,8 +88,8 @@ public:
     const container_type& get() const { return data_; }
     container_type&& extract() { return std::move(data_); }
 
-    bool operator==(const flat_set& v) const { return data_ == v.data_; }
-    bool operator!=(const flat_set& v) const { return data_ != v.data_; }
+    bool operator==(const basic_set& v) const { return data_ == v.data_; }
+    bool operator!=(const basic_set& v) const { return data_ != v.data_; }
 
 
     void reserve(size_type v) { data_.reserve(v); }
@@ -219,7 +219,7 @@ public:
             return { it, false };
         }
     }
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     void insert(Iter first, Iter last)
     {
         for (auto i = first; i != last; ++i) {
@@ -267,45 +267,48 @@ private:
 };
 
 template<class K, class Comp, class Cont1, class Cont2>
-bool operator==(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+bool operator==(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Cont2>& r)
 {
     return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin());
 }
 template<class K, class Comp, class Cont1, class Cont2>
-bool operator!=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+bool operator!=(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Cont2>& r)
 {
     return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin());
 }
 template<class K, class Comp, class Cont1, class Cont2>
-bool operator<(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+bool operator<(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Cont2>& r)
 {
     return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
 }
 template<class K, class Comp, class Cont1, class Cont2>
-bool operator>(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+bool operator>(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Cont2>& r)
 {
     return r < l;
 }
 template<class K, class Comp, class Cont1, class Cont2>
-bool operator<=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+bool operator<=(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Cont2>& r)
 {
     return !(r < l);
 }
 template<class K, class Comp, class Cont1, class Cont2>
-bool operator>=(const flat_set<K, Comp, Cont1>& l, const flat_set<K, Comp, Cont2>& r)
+bool operator>=(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Cont2>& r)
 {
     return !(l < r);
 }
 
 
-template <class Key, size_t Capacity, class Compare = std::less<>>
-using fixed_set = flat_set<Key, Compare, fixed_vector<Key, Capacity>>;
+template <class Key, class Compare = std::less<>>
+using flat_set = basic_set<Key, Compare, std::vector<Key, std::allocator<Key>>>;
 
 template <class Key, size_t Capacity, class Compare = std::less<>>
-using sbo_set = flat_set<Key, Compare, sbo_vector<Key, Capacity>>;
+using fixed_set = basic_set<Key, Compare, fixed_vector<Key, Capacity>>;
+
+template <class Key, size_t Capacity, class Compare = std::less<>>
+using sbo_set = basic_set<Key, Compare, sbo_vector<Key, Capacity>>;
 
 template <class Key, class Compare = std::less<>>
-using mapped_set = flat_set<Key, Compare, mapped_vector<Key>>;
+using mapped_set = basic_set<Key, Compare, mapped_vector<Key>>;
 
 } // namespace ist
 
@@ -313,7 +316,7 @@ using mapped_set = flat_set<Key, Compare, mapped_vector<Key>>;
 namespace std {
 
 template<class K, class Comp, class Cont>
-void swap(ist::flat_set<K, Comp, Cont>& l, ist::flat_set<K, Comp, Cont>& r) noexcept
+void swap(ist::basic_set<K, Comp, Cont>& l, ist::basic_set<K, Comp, Cont>& r) noexcept
 {
     l.swap(r);
 }

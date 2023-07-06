@@ -7,14 +7,14 @@
 
 namespace ist {
 
-template<typename T, typename = void>
+template<class T, class = void>
 constexpr bool is_from_chars_available_v = false;
-template<typename T>
+template<class T>
 constexpr bool is_from_chars_available_v<T, std::void_t<decltype(std::from_chars((const char*)nullptr, (const char*)nullptr, std::declval<T&>()))>> = true;
 
-template<typename Container, class Char, typename = void>
+template<class Container, class Char, class = void>
 constexpr bool is_string_like_v = false;
-template<typename Container, class Char>
+template<class Container, class Char>
 constexpr bool is_string_like_v<Container, Char, std::enable_if_t<
     std::is_same_v<std::decay_t<decltype(*std::declval<Container>().data())>, Char>>> = true;
 
@@ -57,7 +57,7 @@ public:
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_string(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
+    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
     template<class String, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_string_like_v<String, value_type>)>
@@ -139,7 +139,7 @@ public:
         _null_terminate();
         return *this;
     }
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string& assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -184,7 +184,7 @@ public:
         _null_terminate();
         return r;
     }
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -246,7 +246,7 @@ public:
     {
         return insert(size(), 1, ch);
     }
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string& append(Iter first, Iter last)
     {
         insert(end(), first, last);
@@ -300,7 +300,7 @@ public:
 
     // replace
 
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
     {
         size_t count = std::distance(first2, last2);
@@ -787,16 +787,16 @@ template<size_t Capacity> using sbo_wstring = basic_string<wchar_t, sbo_memory<w
 template<size_t Capacity> using sbo_u16string = basic_string<char16_t, sbo_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
 template<size_t Capacity> using sbo_u32string = basic_string<char32_t, sbo_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
 
-using string_view = std::basic_string_view<char, std::char_traits<char>>;
-using wstring_view = std::basic_string_view<wchar_t, std::char_traits<wchar_t>>;
-using u16string_view = std::basic_string_view<char16_t, std::char_traits<char16_t>>;
-using u32string_view = std::basic_string_view<char32_t, std::char_traits<char32_t>>;
+using mapped_string_view = basic_string<char, mapped_memory<char>, std::char_traits<char>>;
+using mapped_wstring_view = basic_string<wchar_t, mapped_memory<wchar_t>, std::char_traits<wchar_t>>;
+using mapped_u16string_view = basic_string<char16_t, mapped_memory<char16_t>, std::char_traits<char16_t>>;
+using mapped_u32string_view = basic_string<char32_t, mapped_memory<char32_t>, std::char_traits<char32_t>>;
 
 #if __cpp_char8_t
 using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
 template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char, Capacity>, std::char_traits<char8_t>>;
 template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-using u8string_view = std::basic_string_view<char8_t, std::char_traits<char8_t>>;
+using mapped_u8string = basic_string<char8_t, mapped_memory<char32_t>, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t
 
 } // namespace ist

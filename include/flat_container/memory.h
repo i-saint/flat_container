@@ -16,27 +16,41 @@
 
 namespace ist {
 
-template <typename T, typename = void>
+// type traits
+
+template<typename T>
+constexpr bool is_pod_v = std::is_trivial_v<T>;
+
+template<class Iter, class T, class = void>
+constexpr bool is_iterator_v = false;
+template<class Iter, class T>
+constexpr bool is_iterator_v<Iter, T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<typename std::iterator_traits<Iter>::value_type>, T>> > = true;
+
+
+template <class T, class = void>
 constexpr bool is_dynamic_memory_v = false;
-template <typename T>
+template <class T>
 constexpr bool is_dynamic_memory_v<T, std::enable_if_t<T::is_dynamic_memory>> = true;
 
-template <typename T, typename = void>
+template <class T, class = void>
 constexpr bool is_sbo_memory_v = false;
-template <typename T>
+template <class T>
 constexpr bool is_sbo_memory_v<T, std::enable_if_t<T::is_sbo_memory>> = true;
 
-template <typename T, typename = void>
+template <class T, class = void>
 constexpr bool is_fixed_memory_v = false;
-template <typename T>
+template <class T>
 constexpr bool is_fixed_memory_v<T, std::enable_if_t<T::is_fixed_memory>> = true;
 
-template <typename T, typename = void>
+template <class T, class = void>
 constexpr bool is_mapped_memory_v = false;
-template <typename T>
+template <class T>
 constexpr bool is_mapped_memory_v<T, std::enable_if_t<T::is_mapped_memory>> = true;
 
 
+// memory models
+
+// typical dynamic memory model
 template<class T>
 class dynamic_memory
 {
@@ -77,7 +91,31 @@ protected:
     T* data_ = nullptr;
 };
 
-// dynamic memory with small buffer optimization
+// fixed size memory block
+template<class T, size_t Capacity>
+class fixed_memory
+{
+public:
+    using value_type = T;
+    static const bool is_fixed_memory = true;
+    static const size_t fixed_capacity = Capacity;
+
+    fixed_memory() {}
+    ~fixed_memory() {}
+
+protected:
+    static const size_t capacity_ = Capacity;
+    size_t size_ = 0;
+    union {
+        T data_[0]; // for debug
+        std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
+    };
+};
+
+// dynamic memory with small buffer optimization.
+// if required size is smaller than internal buffer, internal buffer is used. otherwise, it allocates dynamic memory.
+// so, it behaves like hybrid of dynamic_memory and fixed_memory.
+// (many of std::string implementations use this strategy)
 template<class T, size_t Capacity>
 class sbo_memory
 {
@@ -130,26 +168,12 @@ protected:
     std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
 };
 
-template<class T, size_t Capacity>
-class fixed_memory
-{
-public:
-    using value_type = T;
-    static const bool is_fixed_memory = true;
-    static const size_t fixed_capacity = Capacity;
-
-    fixed_memory() {}
-    ~fixed_memory() {}
-
-protected:
-    static const size_t capacity_ = Capacity;
-    size_t size_ = 0;
-    union {
-        T data_[0]; // for debug
-        std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
-    };
-};
-
+// "wrap" existing memory block.
+// similar to std::span, but it takes ownership.
+// that means, unlike std::span, mapped container have resize(), push_back() and insert().
+// assigning mapped container copies each elements instead of swapping data pointer.
+// mapped containers destroys elements in destructor.
+// calling detach() waives ownership.
 template<class T>
 class mapped_memory
 {
@@ -157,12 +181,9 @@ public:
     using value_type = T;
     static const bool is_mapped_memory = true;
 
-    mapped_memory() {}
-    mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
-    ~mapped_memory() {}
+    constexpr mapped_memory() {}
+    constexpr mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
 
-    // detach data from this view.
-    // (if detach() or swap() are not called, elements are destroyed by destrunctor)
     constexpr void detach()
     {
         capacity_ = size_ = 0;

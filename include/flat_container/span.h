@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <type_traits>
 #if __cpp_lib_span
 #   include <span>
@@ -43,11 +44,18 @@ public:
     constexpr span& operator=(const span& v) = default;
     constexpr span& operator=(span&& v) = default;
 
-    constexpr span(const T* d, size_t s) : data_(const_cast<T*>(d)) {}
+
+    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    constexpr span(Iter first, size_t size) : data_(const_cast<T*>(&*first)) {}
+    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    constexpr explicit span(Iter first, Iter last) : data_(const_cast<T*>(&*first)) {}
+
     template<size_t N>
-    constexpr span(const T(&d)[N]) : data_(const_cast<T*>(d)) {}
+    constexpr span(const T(&v)[N]) : data_(const_cast<T*>(v)) {}
+    template<class U, size_t N>
+    constexpr span(const std::array<U, N>& v) : data_(const_cast<T*>(v.data())) {}
     template<class Container, fc_require(is_sequential_container_v<Container, T>)>
-    constexpr span(const Container& v) : data_(const_cast<T*>(v.data())) {}
+    constexpr explicit span(const Container& v) : data_(const_cast<T*>(v.data())) {}
 
     constexpr bool empty() const { return size_ == 0; }
     constexpr size_t size() const { return size_; }
@@ -119,11 +127,17 @@ public:
     constexpr span& operator=(const span& v) = default;
     constexpr span& operator=(span&& v) = default;
 
-    constexpr span(const T* d, size_t s) : data_(const_cast<T*>(d)) {}
+    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    constexpr span(Iter first, size_t size) : data_(const_cast<T*>(&*first)), size_(size) {}
+    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    constexpr explicit span(Iter first, Iter last) : data_(const_cast<T*>(&*first)), size_(std::distance(first, last)) {}
+
     template<size_t N>
-    constexpr span(const T(&d)[N]) : data_(const_cast<T*>(d)) {}
+    constexpr span(const T(&v)[N]) : data_(const_cast<T*>(v)), size_(N) {}
+    template<class U, size_t N>
+    constexpr span(const std::array<U, N>& v) : data_(const_cast<T*>(v.data())), size_(N) {}
     template<class Container, fc_require(is_sequential_container_v<Container, T>)>
-    constexpr span(const Container& v) : data_(const_cast<T*>(v.data())) {}
+    constexpr explicit span(const Container& v) : data_(const_cast<T*>(v.data())), size_(v.size()) {}
 
     constexpr bool empty() const { return size_ == 0; }
     constexpr size_t size() const { return size_; }

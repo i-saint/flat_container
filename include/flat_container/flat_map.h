@@ -14,7 +14,7 @@ template <
     class Compare = std::less<>,
     class Container = std::vector<std::pair<Key, Value>, std::allocator<std::pair<Key, Value>>>
 >
-class flat_map
+class basic_map
 {
 public:
     using key_type               = Key;
@@ -31,52 +31,52 @@ public:
     using iterator               = typename container_type::iterator;
     using const_iterator         = typename container_type::const_iterator;
 
-    flat_map() {}
-    flat_map(const flat_map& v) { operator=(v); }
-    flat_map(flat_map&& v) noexcept { operator=(std::move(v)); }
-    flat_map(const container_type& v) { operator=(v); }
-    flat_map(container_type&& v) noexcept { operator=(std::move(v)); }
+    basic_map() {}
+    basic_map(const basic_map& v) { operator=(v); }
+    basic_map(basic_map&& v) noexcept { operator=(std::move(v)); }
+    basic_map(const container_type& v) { operator=(v); }
+    basic_map(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
-    flat_map(Iter first, Iter last)
+    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    basic_map(Iter first, Iter last)
     {
         insert(first, last);
     }
     template <bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped)>
-    flat_map(std::initializer_list<value_type> list)
+    basic_map(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
     template<bool mapped = is_mapped_memory_v<container_type>, fc_require(mapped)>
-    flat_map(void* data, size_t capacity, size_t size = 0)
+    basic_map(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
     }
 
-    flat_map& operator=(const flat_map& v)
+    basic_map& operator=(const basic_map& v)
     {
         data_ = v.data_;
         return *this;
     }
-    flat_map& operator=(flat_map&& v) noexcept
+    basic_map& operator=(basic_map&& v) noexcept
     {
         swap(v);
         return *this;
     }
-    flat_map& operator=(const container_type& v)
+    basic_map& operator=(const container_type& v)
     {
         data_ = v.data_;
         sort();
         return *this;
     }
-    flat_map& operator=(container_type&& v) noexcept
+    basic_map& operator=(container_type&& v) noexcept
     {
         swap(v);
         return *this;
     }
 
-    void swap(flat_map& v) noexcept
+    void swap(basic_map& v) noexcept
     {
         data_.swap(v.data_);
     }
@@ -89,8 +89,8 @@ public:
     const container_type& get() const { return data_; }
     container_type&& extract() { return std::move(data_); }
 
-    bool operator==(const flat_map& v) const noexcept { return data_ == v.data_; }
-    bool operator!=(const flat_map& v) const noexcept { return data_ != v.data_; }
+    bool operator==(const basic_map& v) const noexcept { return data_ == v.data_; }
+    bool operator!=(const basic_map& v) const noexcept { return data_ != v.data_; }
 
     void reserve(size_type v) { data_.reserve(v); }
     void clear() { data_.clear(); }
@@ -220,7 +220,7 @@ public:
             return { it, false };
         }
     }
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     void insert(Iter first, Iter last)
     {
         for (auto i = first; i != last; ++i) {
@@ -320,45 +320,48 @@ private:
 };
 
 template<class K, class V, class Comp, class Cont1, class Cont2>
-bool operator==(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp, Cont2>& r)
+bool operator==(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Comp, Cont2>& r)
 {
     return l.size() == r.size() && std::equal(l.begin(), l.end(), r.begin());
 }
 template<class K, class V, class Comp, class Cont1, class Cont2>
-bool operator!=(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp, Cont2>& r)
+bool operator!=(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Comp, Cont2>& r)
 {
     return l.size() != r.size() || !std::equal(l.begin(), l.end(), r.begin());
 }
 template<class K, class V, class Comp, class Cont1, class Cont2>
-bool operator<(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp, Cont2>& r)
+bool operator<(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Comp, Cont2>& r)
 {
     return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
 }
 template<class K, class V, class Comp, class Cont1, class Cont2>
-bool operator>(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp, Cont2>& r)
+bool operator>(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Comp, Cont2>& r)
 {
     return r < l;
 }
 template<class K, class V, class Comp, class Cont1, class Cont2>
-bool operator<=(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp, Cont2>& r)
+bool operator<=(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Comp, Cont2>& r)
 {
     return !(r < l);
 }
 template<class K, class V, class Comp, class Cont1, class Cont2>
-bool operator>=(const flat_map<K, V, Comp, Cont1>& l, const flat_map<K, V, Comp, Cont2>& r)
+bool operator>=(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Comp, Cont2>& r)
 {
     return !(l < r);
 }
 
 
-template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
-using fixed_map = flat_map<Key, Value, Compare, fixed_vector<std::pair<Key, Value>, Capacity>>;
+template <class Key, class Value, class Compare = std::less<>>
+using flat_map = basic_map<Key, Value, Compare, std::vector<std::pair<Key, Value>, std::allocator<std::pair<Key, Value>>>>;
 
 template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
-using sbo_map = flat_map<Key, Value, Compare, sbo_vector<std::pair<Key, Value>, Capacity>>;
+using fixed_map = basic_map<Key, Value, Compare, fixed_vector<std::pair<Key, Value>, Capacity>>;
+
+template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
+using sbo_map = basic_map<Key, Value, Compare, sbo_vector<std::pair<Key, Value>, Capacity>>;
 
 template <class Key, class Value, class Compare = std::less<>>
-using mapped_map = flat_map<Key, Value, Compare, mapped_vector<std::pair<Key, Value>>>;
+using mapped_map = basic_map<Key, Value, Compare, mapped_vector<std::pair<Key, Value>>>;
 
 } // namespace ist
 
@@ -366,7 +369,7 @@ using mapped_map = flat_map<Key, Value, Compare, mapped_vector<std::pair<Key, Va
 namespace std {
 
 template<class K, class V, class Comp, class Cont>
-void swap(ist::flat_map<K, V, Comp, Cont>& l, ist::flat_map<K, V, Comp, Cont>& r) noexcept
+void swap(ist::basic_map<K, V, Comp, Cont>& l, ist::basic_map<K, V, Comp, Cont>& r) noexcept
 {
     l.swap(r);
 }

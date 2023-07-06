@@ -31,7 +31,7 @@ public:
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_vector(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
+    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_vector(Iter first, Iter last) { assign(first, last); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
@@ -88,7 +88,7 @@ public:
         _shrink(1);
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -103,7 +103,7 @@ public:
         _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
