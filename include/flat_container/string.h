@@ -41,10 +41,8 @@ public:
             _null_terminate();
         }
     }
-    constexpr basic_string(const basic_string& r) = default;
-    constexpr basic_string(basic_string&& r) noexcept = default;
-    constexpr basic_string& operator=(const basic_string& r) = default;
-    constexpr basic_string& operator=(basic_string&& r) noexcept = default;
+    basic_string(const basic_string& r) { operator=(r); }
+    basic_string(basic_string&& r) noexcept { operator=(std::move(r)); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
     constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }
@@ -90,6 +88,16 @@ public:
 
     constexpr const_pointer c_str() const { return data(); }
     constexpr size_t length() const { return size(); }
+
+    constexpr basic_string& operator=(const basic_string& r)
+    {
+        return assign(r);
+    }
+    constexpr basic_string& operator=(basic_string&& r) noexcept
+    {
+        swap(r);
+        return *this;
+    }
 
     constexpr void resize(size_t n)
     {
