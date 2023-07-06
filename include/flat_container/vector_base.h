@@ -1,51 +1,8 @@
 #pragma once
-#include <cstddef>
-#include <initializer_list>
-#include <type_traits>
-#include <iterator>
-#include <type_traits>
-#include <memory>
-#if __cpp_lib_span
-#   include <span>
-#endif
-
-#ifdef _DEBUG
-#   if !defined(FC_ENABLE_CAPACITY_CHECK)
-#       define FC_ENABLE_CAPACITY_CHECK
-#   endif
-#endif
-
-#define fc_require(...) std::enable_if_t<__VA_ARGS__, bool> = true
+#include "memory.h"
+#include "span.h"
 
 namespace ist {
-
-template <typename T, typename = void>
-constexpr bool is_dynamic_memory_v = false;
-template <typename T>
-constexpr bool is_dynamic_memory_v<T, std::enable_if_t<T::is_dynamic_memory>> = true;
-
-template <typename T, typename = void>
-constexpr bool is_sbo_memory_v = false;
-template <typename T>
-constexpr bool is_sbo_memory_v<T, std::enable_if_t<T::is_sbo_memory>> = true;
-
-template <typename T, typename = void>
-constexpr bool is_fixed_memory_v = false;
-template <typename T>
-constexpr bool is_fixed_memory_v<T, std::enable_if_t<T::is_fixed_memory>> = true;
-
-template <typename T, typename = void>
-constexpr bool is_mapped_memory_v = false;
-template <typename T>
-constexpr bool is_mapped_memory_v<T, std::enable_if_t<T::is_mapped_memory>> = true;
-
-template<typename T, typename = void>
-constexpr bool is_iterator_v = false;
-template<typename T>
-constexpr bool is_iterator_v<T, typename std::enable_if_t<!std::is_same_v<typename std::iterator_traits<T>::value_type, void>>> = true;
-
-template<typename T>
-constexpr bool is_pod_v = std::is_trivial_v<T>;
 
 
 // std::construct_at() requires c++20 so define our own.
@@ -67,191 +24,8 @@ inline constexpr void _destroy(const Iter first, const Iter last)
 }
 
 
-template<class T>
-class dynamic_memory
-{
-public:
-    using value_type = T;
-    static const bool is_dynamic_memory = true;
-
-    dynamic_memory() {}
-    ~dynamic_memory() { _deallocate(data_); }
-
-    void reserve(size_t n)
-    {
-        if (n <= capacity_) {
-            return;
-        }
-        size_t new_capaity = std::max<size_t>(n, capacity_ * 2);
-        _reallocate(new_capaity);
-    }
-
-    void shrink_to_fit()
-    {
-        _reallocate(size_);
-    }
-
-protected:
-    T* _allocate(size_t size)
-    {
-        return (T*)std::malloc(sizeof(T) * size);
-    }
-    void _deallocate(void *addr)
-    {
-        std::free(addr);
-    }
-
-    void _reallocate(size_t new_capaity)
-    {
-        T* new_data = _allocate(new_capaity);
-        if constexpr (is_pod_v<T>) {
-            std::memcpy(new_data, data_, sizeof(T) * size_);
-        }
-        else {
-            for (size_t i = 0; i < size_; ++i) {
-                _construct_at<T>(&new_data[i], std::move(data_[i]));
-                _destroy_at(&data_[i]);
-            }
-        }
-
-        _deallocate(data_);
-        data_ = new_data;
-        capacity_ = new_capaity;
-    }
-
-    size_t capacity_ = 0;
-    size_t size_ = 0;
-    T* data_ = nullptr;
-};
-
-// dynamic memory with small buffer optimization
-template<class T, size_t Capacity>
-class sbo_memory
-{
-public:
-    using value_type = T;
-    static const bool is_sbo_memory = true;
-    static const size_t fixed_capacity = Capacity;
-
-    sbo_memory() {}
-    ~sbo_memory() { _deallocate(data_); }
-
-    constexpr size_t buffer_capacity() noexcept { return buffer_capacity_; }
-
-    void reserve(size_t n)
-    {
-        if (n <= capacity_) {
-            return;
-        }
-        size_t new_capaity = std::max<size_t>(n, capacity_ * 2);
-        _reallocate(new_capaity);
-    }
-
-    void shrink_to_fit()
-    {
-        _reallocate(size_);
-    }
-
-protected:
-    T* _allocate(size_t size)
-    {
-        if (size <= buffer_capacity_) {
-            return (T*)buffer_;
-        }
-        else {
-            return (T*)std::malloc(sizeof(T) * size);
-        }
-    }
-    void _deallocate(void* addr)
-    {
-        if (addr != buffer_) {
-            std::free(addr);
-        }
-    }
-
-    void _reallocate(size_t new_capaity)
-    {
-        T* new_data = _allocate(new_capaity);
-        if (new_data == data_) {
-            return;
-        }
-
-        if constexpr (is_pod_v<T>) {
-            std::memcpy(new_data, data_, sizeof(T) * size_);
-        }
-        else {
-            for (size_t i = 0; i < size_; ++i) {
-                _construct_at<T>(new_data + i, std::move(data_[i]));
-                _destroy_at(&data_[i]);
-            }
-        }
-
-        _deallocate(data_);
-        data_ = new_data;
-        capacity_ = new_capaity;
-    }
-
-    static const size_t buffer_capacity_ = Capacity;
-    size_t capacity_ = Capacity;
-    size_t size_ = 0;
-    T* data_ = (T*)buffer_;
-    std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
-};
-
-template<class T, size_t Capacity>
-class fixed_memory
-{
-public:
-    using value_type = T;
-    static const bool is_fixed_memory = true;
-    static const size_t fixed_capacity = Capacity;
-
-    fixed_memory() {}
-    ~fixed_memory() {}
-
-    constexpr void reserve(size_t n) {}
-    constexpr void shrink_to_fit() {}
-
-protected:
-    static const size_t capacity_ = Capacity;
-    size_t size_ = 0;
-    union {
-        T data_[0]; // for debug
-        std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
-    };
-};
-
-template<class T>
-class mapped_memory
-{
-public:
-    using value_type = T;
-    static const bool is_mapped_memory = true;
-
-    mapped_memory() {}
-    mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
-    ~mapped_memory() {}
-
-    constexpr void reserve(size_t n) {}
-    constexpr void shrink_to_fit() {}
-
-    // detach data from this view.
-    // (if detach() or swap() are not called, elements are destroyed by destrunctor)
-    constexpr void detach()
-    {
-        capacity_ = size_ = 0;
-        data_ = nullptr;
-    }
-
-protected:
-    size_t capacity_ = 0;
-    size_t size_ = 0;
-    T* data_ = nullptr;
-};
-
-
 template<class Memory>
-class memory_boilerplate : public Memory
+class vector_base : public Memory
 {
 using super = Memory;
 public:
@@ -264,28 +38,32 @@ public:
     using const_iterator = const_pointer;
 
 
-    memory_boilerplate() {}
-    memory_boilerplate(const memory_boilerplate& r) { operator=(r); }
-    memory_boilerplate(memory_boilerplate&& r) noexcept { operator=(std::move(r)); }
+    vector_base() {}
+    vector_base(const vector_base& r) { operator=(r); }
+    vector_base(vector_base&& r) noexcept { operator=(std::move(r)); }
     template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
-    constexpr memory_boilerplate(void* data, size_t capacity, size_t size = 0)
+    constexpr vector_base(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
     }
-    ~memory_boilerplate() { clear(); }
+    ~vector_base()
+    {
+        clear();
+        shrink_to_fit();
+    }
 
-    memory_boilerplate& operator=(const memory_boilerplate& r)
+    vector_base& operator=(const vector_base& r)
     {
         _assign(r.size(), [&](pointer dst) { _copy_range(dst, r.begin(), r.end()); });
         return *this;
     }
-    memory_boilerplate& operator=(memory_boilerplate&& r)
+    vector_base& operator=(vector_base&& r)
     {
         swap(r);
         return *this;
     }
 
-    constexpr void swap(memory_boilerplate& r)
+    constexpr void swap(vector_base& r)
     {
         if constexpr (is_dynamic_memory_v<super> || is_mapped_memory_v<super>) {
             std::swap(this->capacity_, r.capacity_);
@@ -304,6 +82,24 @@ public:
         }
         else if constexpr (super::is_fixed_memory) {
             this->_swap_content(r);
+        }
+    }
+
+    void reserve(size_t n)
+    {
+        if constexpr (is_dynamic_memory_v<super> || is_sbo_memory_v<super>) {
+            if (n <= this->capacity_) {
+                return;
+            }
+            size_t new_capaity = std::max<size_t>(n, this->capacity_ * 2);
+            _resize_capacity(new_capaity);
+        }
+    }
+
+    void shrink_to_fit()
+    {
+        if constexpr (is_dynamic_memory_v<super> || is_mapped_memory_v<super>) {
+            _resize_capacity(this->size_);
         }
     }
 
@@ -334,15 +130,31 @@ public:
     constexpr reference back() { _boundary_check(1); return this->data_[this->size_ - 1]; }
     constexpr const_reference back() const { _boundary_check(1); return this->data_[this->size_ - 1]; }
 
-#if __cpp_lib_span
-    constexpr operator std::span<T>() const noexcept
+    constexpr operator span<value_type>() const noexcept
     {
         return { data(), size() };
     }
-#endif
 
 protected:
-    template<class Iter>
+    void _resize_capacity(size_t new_capaity)
+    {
+        if constexpr (is_dynamic_memory_v<super> || is_sbo_memory_v<super>) {
+            this->_reallocate(new_capaity, [&](pointer new_data) {
+                size_t size_move = this->size_; // new_capacity is always >= this->size_
+                if constexpr (is_pod_v<value_type>) {
+                    std::memcpy(new_data, this->data_, sizeof(value_type) * size_move);
+                }
+                else {
+                    for (size_t i = 0; i < size_move; ++i) {
+                        _construct_at<value_type>(new_data + i, std::move(this->data_[i]));
+                        _destroy_at(&this->data_[i]);
+                    }
+                }
+                });
+        }
+    }
+
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr void _copy_range(iterator dst, Iter first, Iter last)
     {
         if constexpr (is_pod_v<value_type>) {
@@ -365,7 +177,7 @@ protected:
             }
         }
     }
-    constexpr void _copy_n(iterator dst, const value_type& v, size_t n)
+    constexpr void _copy_n(iterator dst, const_reference v, size_t n)
     {
         if constexpr (is_pod_v<value_type>) {
             auto end_assign = dst + n;
@@ -432,7 +244,7 @@ protected:
         }
     }
 
-    constexpr void _swap_content(memory_boilerplate& r)
+    constexpr void _swap_content(vector_base& r)
     {
         size_t max_size = std::max(this->size_, r.size_);
         this->reserve(max_size);
@@ -620,4 +432,3 @@ inline auto make_constant_iterator(T& v) {
 }
 
 } // namespace ist
-

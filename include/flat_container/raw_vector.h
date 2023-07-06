@@ -1,16 +1,21 @@
 #pragma once
-#include "foundation.h"
+#include "vector_base.h"
 
 namespace ist {
 
 template<class T, class Memory>
-class basic_raw_vector : public memory_boilerplate<Memory>
+class basic_raw_vector : public vector_base<Memory>
 {
-using super = memory_boilerplate<Memory>;
+using super = vector_base<Memory>;
 public:
     // T must be pod
     static_assert(is_pod_v<T>);
 
+    using typename super::value_type;
+    using typename super::pointer;
+    using typename super::const_pointer;
+    using typename super::reference;
+    using typename super::const_reference;
     using typename super::iterator;
     using typename super::const_iterator;
 
@@ -24,12 +29,12 @@ public:
     constexpr explicit basic_raw_vector(size_t n) { resize(n); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
-    constexpr basic_raw_vector(size_t n, const T& v) { resize(n, v); }
+    constexpr basic_raw_vector(size_t n, const_reference v) { resize(n, v); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
-    constexpr basic_raw_vector(std::initializer_list<T> r) { assign(r); }
+    constexpr basic_raw_vector(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter>)>
+    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_raw_vector(Iter first, Iter last) { assign(first, last); }
 
     template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
@@ -58,22 +63,22 @@ public:
 
     constexpr void resize(size_t n)
     {
-        _resize(n, [&](T*) {}); // new elements are uninitialized
+        _resize(n, [&](pointer) {}); // new elements are uninitialized
     }
-    constexpr void resize(size_t n, const T& v)
+    constexpr void resize(size_t n, const_reference v)
     {
-        _resize(n, [&](T* addr) { *addr = v; });
+        _resize(n, [&](pointer addr) { *addr = v; });
     }
 
-    constexpr void push_back(const T& v)
+    constexpr void push_back(const_reference v)
     {
-        _expand(1, [&](T* addr) { *addr = v; });
+        _expand(1, [&](pointer addr) { *addr = v; });
     }
 
     template< class... Args >
-    constexpr T& emplace_back(Args&&... args)
+    constexpr reference emplace_back(Args&&... args)
     {
-        _expand(1, [&](T* addr) { *addr = T(std::forward<Args>(args)...); });
+        _expand(1, [&](pointer addr) { *addr = value_type(std::forward<Args>(args)...); });
         return back();
     }
 
@@ -82,39 +87,39 @@ public:
         _shrink(1);
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        _assign(n, [&](T* dst) { _copy_range(dst, first, last); });
+        _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
     }
-    constexpr void assign(std::initializer_list<T> list)
+    constexpr void assign(std::initializer_list<value_type> list)
     {
-        _assign(list.size(), [&](T* dst) { _copy_range(dst, list.begin(), list.end()); });
+        _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
     }
-    constexpr void assign(size_t n, const T& v)
+    constexpr void assign(size_t n, const_reference v)
     {
-        _assign(n, [&](T* dst) { _copy_n(dst, v, n); });
+        _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter>)>
+    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        return _insert(pos, n, [&](T* addr) { _copy_range(addr, first, last); });
+        return _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
     }
-    constexpr iterator insert(iterator pos, std::initializer_list<T> list)
+    constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
-        return _insert(pos, list.size(), [&](T* addr) { _copy_range(addr, list.begin(), list.end()); });
+        return _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
     }
-    constexpr iterator insert(iterator pos, const T& v)
+    constexpr iterator insert(iterator pos, const_reference v)
     {
-        return _insert(pos, 1, [&](T* addr) { _copy_n(addr, v, 1); });
+        return _insert(pos, 1, [&](pointer addr) { _copy_n(addr, v, 1); });
     }
     template< class... Args >
     constexpr iterator emplace(iterator pos, Args&&... args)
     {
-        return _insert(pos, 1, [&](T* addr) { _emplace_one(addr, std::forward<Args>(args)...); });
+        return _insert(pos, 1, [&](pointer addr) { _emplace_one(addr, std::forward<Args>(args)...); });
     }
 
     constexpr iterator erase(iterator first, iterator last)
