@@ -56,7 +56,7 @@ class dynamic_memory
 {
 public:
     using value_type = T;
-    static const bool is_dynamic_memory = true;
+    static constexpr bool is_dynamic_memory = true;
 
 protected:
     T* _allocate(size_t size)
@@ -97,14 +97,14 @@ class fixed_memory
 {
 public:
     using value_type = T;
-    static const bool is_fixed_memory = true;
-    static const size_t fixed_capacity = Capacity;
+    static constexpr bool is_fixed_memory = true;
+    static constexpr size_t fixed_capacity = Capacity;
 
     fixed_memory() {}
     ~fixed_memory() {}
 
 protected:
-    static const size_t capacity_ = Capacity;
+    static constexpr size_t capacity_ = Capacity;
     size_t size_ = 0;
     union {
         T data_[0]; // for debug
@@ -121,15 +121,15 @@ class sbo_memory
 {
 public:
     using value_type = T;
-    static const bool is_sbo_memory = true;
-    static const size_t fixed_capacity = Capacity;
+    static constexpr bool is_sbo_memory = true;
+    static constexpr size_t fixed_capacity = Capacity;
 
-    constexpr size_t buffer_capacity() noexcept { return buffer_capacity_; }
+    constexpr size_t buffer_capacity() noexcept { return fixed_capacity; }
 
 protected:
     T* _allocate(size_t size)
     {
-        if (size <= buffer_capacity_) {
+        if (size <= fixed_capacity) {
             return (T*)buffer_;
         }
         else {
@@ -161,11 +161,10 @@ protected:
         capacity_ = new_capaity;
     }
 
-    static const size_t buffer_capacity_ = Capacity;
-    size_t capacity_ = Capacity;
+    size_t capacity_ = fixed_capacity;
     size_t size_ = 0;
     T* data_ = (T*)buffer_;
-    std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
+    std::byte buffer_[sizeof(T) * fixed_capacity]; // uninitialized in intention
 };
 
 // "wrap" existing memory block.
@@ -179,7 +178,7 @@ class mapped_memory
 {
 public:
     using value_type = T;
-    static const bool is_mapped_memory = true;
+    static constexpr bool is_mapped_memory = true;
 
     constexpr mapped_memory() {}
     constexpr mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}

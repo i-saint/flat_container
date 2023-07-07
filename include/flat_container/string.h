@@ -95,7 +95,7 @@ public:
     }
     constexpr basic_string& operator=(basic_string&& r) noexcept
     {
-        swap(r);
+        this->swap(r);
         return *this;
     }
 
