@@ -788,7 +788,7 @@ using u32string = basic_string<char32_t, dynamic_memory<char32_t>, std::char_tra
 template<size_t Capacity> using fixed_string = basic_string<char, fixed_memory<char, Capacity>, std::char_traits<char>>;
 template<size_t Capacity> using fixed_wstring = basic_string<wchar_t, fixed_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
 template<size_t Capacity> using fixed_u16string = basic_string<char16_t, fixed_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
-template<size_t Capacity> using fixed_u32string = basic_string<char32_t, fixed_memory<char, Capacity>, std::char_traits<char>>;
+template<size_t Capacity> using fixed_u32string = basic_string<char32_t, fixed_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
 
 template<size_t Capacity> using sbo_string = basic_string<char, sbo_memory<char, Capacity>, std::char_traits<char>>;
 template<size_t Capacity> using sbo_wstring = basic_string<wchar_t, sbo_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
@@ -802,9 +802,9 @@ using mapped_u32string_view = basic_string<char32_t, mapped_memory<char32_t>, st
 
 #if __cpp_char8_t
 using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
-template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char, Capacity>, std::char_traits<char8_t>>;
+template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
 template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-using mapped_u8string = basic_string<char8_t, mapped_memory<char32_t>, std::char_traits<char8_t>>;
+using mapped_u8string = basic_string<char8_t, mapped_memory<char8_t>, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t
 
 } // namespace ist
