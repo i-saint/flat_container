@@ -476,25 +476,54 @@ bool streq_uint64(const char* _a, const char* _b, size_t len)
     return true;
 }
 
-// len must be multiples of 16
 __declspec(noinline)
 bool streq_sse42(const char* _a, const char* _b, size_t len)
 {
-    auto a = (const __m128i*)_a;
-    auto b = (const __m128i*)_b;
-    size_t n = len / 16;
-    for (size_t i = 0; i < n; ++i) {
-        int r = _mm_cmpestri(
-            _mm_loadu_si128(a++), 16,
-            _mm_loadu_si128(b++), 16,
-            _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ORDERED);
-        //printf("%d\n", r);
+    size_t remain = len;
+    auto ld = (const __m128i*)_a;
+    auto rd = (const __m128i*)_b;
+    while (remain > 0)
+    {
+        int cmpcount = std::min<int>(remain, 16);
+        __m128i l128 = _mm_loadu_si128(ld++);
+        __m128i r128 = _mm_loadu_si128(rd++);
+        int r = _mm_cmpestri(l128, cmpcount, r128, cmpcount, _SIDD_CMP_EQUAL_ORDERED);
         if (r != 0) {
             return false;
         }
+        remain -= cmpcount;
     }
     return true;
 }
+
+__declspec(noinline)
+bool strcmp_stdc(const char* _a, const char* _b, size_t len)
+{
+    return std::char_traits<char>::compare(_a, _b, len);
+}
+
+__declspec(noinline)
+bool strcmp_sse42(const char* _a, const char* _b, size_t len)
+{
+    size_t remain = len;
+    auto ld = reinterpret_cast<const __m128i*>(_a);
+    auto rd = reinterpret_cast<const __m128i*>(_b);
+    while (remain > 0)
+    {
+        int cmpcount = std::min<int>(remain, 16);
+        __m128i l128 = _mm_loadu_si128(ld++);
+        __m128i r128 = _mm_loadu_si128(rd++);
+        int r = _mm_cmpestri(l128, cmpcount, r128, cmpcount, _SIDD_CMP_EQUAL_ORDERED);
+        if (r != 0)
+        {
+            return r;
+        }
+        remain -= cmpcount;
+    }
+    return 0;
+}
+
+
 #endif
 
 testCase(test_fixed_string)
@@ -650,6 +679,23 @@ testCase(test_fixed_string)
             }
         }
         printf("streq_sse42(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            r += strcmp_stdc(a[i].c_str(), b[i].c_str(), len);
+        }
+        printf("strcmp_stdc(): %.2lfms %d\n", timer.elapsed_ms(), r);
+    }
+    {
+        Timer timer;
+        int r = 0;
+        for (uint64_t i = 0; i < num; ++i) {
+            r += strcmp_sse42(a[i].c_str(), b[i].c_str(), len);
+        }
+        printf("strcmp_sse42(): %.2lfms %d\n", timer.elapsed_ms(), r);
     }
 #endif
 }

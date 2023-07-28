@@ -172,13 +172,13 @@ public:
 
     // insert
 
-    constexpr iterator insert(iterator pos, pointer str, size_t n)
+    constexpr iterator insert(iterator pos, const_pointer str, size_t n)
     {
         auto r = _insert(pos, n, [&](pointer addr) { _copy_range(addr, str, str + n); });
         _null_terminate();
         return r;
     }
-    constexpr iterator insert(iterator pos, pointer str)
+    constexpr iterator insert(iterator pos, const_pointer str)
     {
         return insert(pos, str, Traits::length(str));
     }
@@ -532,12 +532,6 @@ public:
         }
     }
 
-    constexpr size_t hash() const
-    {
-        return _hash(data(), size_bytes());
-    }
-
-
 protected:
     using super::_copy_range;
     using super::_copy_n;
@@ -567,14 +561,14 @@ protected:
                 return static_cast<size_t>(found - str1);
             }
         }
-        return static_cast<size_t>(-1);
+        return npos;
     }
     constexpr size_t _find_str(const_pointer str2, size_t size2, size_t offset) const noexcept
     {
         const_pointer str1 = data();
         const size_t size1 = size();
         if (size2 > size1 || offset > size1 - size2) {
-            return static_cast<size_t>(-1);
+            return npos;
         }
         if (size2 == 0) {
             return offset;
@@ -584,7 +578,7 @@ protected:
         for (auto s = str1 + offset;; ++s) {
             s = Traits::find(s, static_cast<size_t>(end - s), *str2);
             if (!s) {
-                return static_cast<size_t>(-1);
+                return npos;
             }
             if (Traits::compare(s, str2, size2) == 0) {
                 return static_cast<size_t>(s - str1);
@@ -606,19 +600,6 @@ protected:
         // data_ changes if insert() causes allocation. in that case, first is no longer valid.
         do_copy(begin() + d);
         return *this;
-    }
-
-    static inline size_t _hash(const void* _data, size_t size)
-    {
-        constexpr size_t _basis = size_t(14695981039346656037U);
-        constexpr size_t _prime = size_t(1099511628211U);
-        auto data = (const std::byte*)_data;
-        size_t v = _basis;
-        for (size_t i = 0; i < size; ++i) {
-            v ^= static_cast<size_t>(data[i]);
-            v *= _prime;
-        }
-        return v;
     }
 };
 
@@ -813,33 +794,33 @@ using mapped_u8string = basic_string<char8_t, mapped_memory<char8_t>, std::char_
 namespace std {
 
 template<class T, class M, class Traits>
-void swap(ist::basic_string<T, M, Traits>& l, ist::basic_string<T, M, Traits>& r) noexcept
+inline void swap(ist::basic_string<T, M, Traits>& l, ist::basic_string<T, M, Traits>& r) noexcept
 {
     l.swap(r);
 }
 
 template<class T, class M, class Traits>
-int stoi(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<int>(pos, base); }
+inline int stoi(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<int>(pos, base); }
 template<class T, class M, class Traits>
-long stol(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<long>(pos, base); }
+inline long stol(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<long>(pos, base); }
 template<class T, class M, class Traits>
-long long stoll(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<long long>(pos, base); }
+inline long long stoll(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<long long>(pos, base); }
 template<class T, class M, class Traits>
-unsigned long stoul(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<unsigned long>(pos, base); }
+inline unsigned long stoul(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<unsigned long>(pos, base); }
 template<class T, class M, class Traits>
-unsigned long long stoull(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<unsigned long long>(pos, base); }
+inline unsigned long long stoull(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<unsigned long long>(pos, base); }
 template<class T, class M, class Traits>
-float stof(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr) { return v.template to_number<float>(pos); }
+inline float stof(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr) { return v.template to_number<float>(pos); }
 template<class T, class M, class Traits>
-double stod(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr) { return v.template to_number<double>(pos); }
+inline double stod(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr) { return v.template to_number<double>(pos); }
 template<class T, class M, class Traits>
-long double stold(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr) { return v.template to_number<long double>(pos); }
+inline long double stold(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr) { return v.template to_number<long double>(pos); }
 
 template<class T, class M, class Traits>
 struct hash<ist::basic_string<T, M, Traits>>
 {
     size_t operator()(const ist::basic_string<T, M, Traits>& r) const noexcept {
-        return r.hash();
+        return hash<std::string_view>()(r);
     }
 };
 

@@ -369,7 +369,7 @@ using mapped_map = basic_map<Key, Value, Compare, mapped_vector<std::pair<Key, V
 namespace std {
 
 template<class K, class V, class Comp, class Cont>
-void swap(ist::basic_map<K, V, Comp, Cont>& l, ist::basic_map<K, V, Comp, Cont>& r) noexcept
+inline void swap(ist::basic_map<K, V, Comp, Cont>& l, ist::basic_map<K, V, Comp, Cont>& r) noexcept
 {
     l.swap(r);
 }

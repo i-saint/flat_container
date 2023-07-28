@@ -197,7 +197,7 @@ using mapped_raw_vector = basic_raw_vector<T, mapped_memory<T>>;
 namespace std {
 
 template<class T, class M>
-void swap(ist::basic_raw_vector<T, M>& l, ist::basic_raw_vector<T, M>& r) noexcept
+inline void swap(ist::basic_raw_vector<T, M>& l, ist::basic_raw_vector<T, M>& r) noexcept
 {
     l.swap(r);
 }
