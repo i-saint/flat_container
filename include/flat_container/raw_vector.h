@@ -124,7 +124,7 @@ public:
 
     constexpr iterator erase(iterator first, iterator last)
     {
-        _copy_range(first, last, end());
+        _copy_range(first, last, end(), std::true_type{});
         _shrink(std::distance(first, last));
         return first;
     }

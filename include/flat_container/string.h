@@ -110,6 +110,14 @@ public:
         _null_terminate();
     }
 
+    template<class Operation>
+    constexpr void resize_and_overwrite(size_t n, Operation op = [](pointer, size_t s) { return s; })
+    {
+        size_t size = 0;
+        _resize(n, [&](pointer addr) { size = op(addr, n); });
+        this->size_ = size;
+    }
+
     constexpr void push_back(const_reference v)
     {
         _expand(1, [&](pointer addr) { *addr = v; });
@@ -222,7 +230,9 @@ public:
     }
     constexpr basic_string& insert(size_t pos, size_t count, value_type ch)
     {
-        return insert(pos, &ch, 0, 1);
+        _insert(begin() + pos, count, [&](pointer addr) { _copy_n(addr, ch, count); });
+        _null_terminate();
+        return *this;
     }
     template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& insert(size_t pos, const String& str, size_t offset, size_t count = npos)
@@ -244,36 +254,44 @@ public:
 
     constexpr basic_string& append(const_pointer str, size_t count)
     {
-        return insert(size(), str, 0, count);
+        size_t pos = size();
+        resize(pos + count);
+        _copy_range(data() + pos, str, str + count);
+        return *this;
     }
     constexpr basic_string& append(const_pointer str)
     {
-        return insert(size(), str);
+        return append(str, Traits::length(str));
     }
     constexpr basic_string& append(value_type ch)
     {
-        return insert(size(), 1, ch);
+        return append(&ch, 1);
     }
     template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string& append(Iter first, Iter last)
     {
-        insert(end(), first, last);
+        size_t count = std::distance(first, last);
+        size_t pos = size();
+        resize(pos + count);
+        _copy_range(data() + pos, first, last);
         return *this;
     }
     constexpr basic_string& append(std::initializer_list<value_type> list)
     {
-        insert(end(), list.begin(), list.end());
-        return *this;
+        return append(list.begin(), list.end());
     }
     template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& append(const String& str)
     {
-        return insert(size(), str);
+        return append(str.begin(), str.end());
     }
     template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string& append(const String& str, size_t offset, size_t count = npos)
     {
-        return insert(size(), str, offset, count);
+        count = count == npos ? str.size() - offset : count;
+        auto first = str.begin() + offset;
+        auto last = str.begin() + offset + count;
+        return append(first, last);
     }
 
     constexpr basic_string& operator+=(value_type ch) { return append(ch); }
@@ -287,7 +305,7 @@ public:
 
     constexpr iterator erase(iterator first, iterator last)
     {
-        _copy_range(first, last, end());
+        _copy_range(first, last, end(), std::true_type{});
         _shrink(std::distance(first, last));
         _null_terminate();
         return first;
@@ -378,6 +396,98 @@ public:
     constexpr size_t find(const String& str, size_t pos = 0) const noexcept
     {
         return _find_str(str.data(), str.size(), pos);
+    }
+
+
+    // find_first_of
+
+    constexpr size_t find_first_of(const_pointer str, size_t pos, size_t count) const noexcept
+    {
+        auto it = _find_first_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
+        auto r = std::distance(begin(), it);
+        return r == size() ? npos : r;
+    }
+    constexpr size_t find_first_of(const_pointer str, size_t pos = 0) const noexcept
+    {
+        return find_first_of(str, pos, Traits::length(str));
+    }
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    constexpr size_t find_first_of(const String& str, size_t pos = 0) const noexcept
+    {
+        return find_first_of(str.data(), pos, str.size());
+    }
+    constexpr size_t find_first_of(value_type ch, size_t pos = 0) const noexcept
+    {
+        return find_first_of(&ch, pos, 1);
+    }
+
+
+    // find_first_not_of
+
+    constexpr size_t find_first_not_of(const_pointer str, size_t pos, size_t count) const noexcept
+    {
+        auto it = _find_first_not_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
+        auto r = std::distance(begin(), it);
+        return r == size() ? npos : r;
+    }
+    constexpr size_t find_first_not_of(const_pointer str, size_t pos = 0) const noexcept
+    {
+        return find_first_not_of(str, pos, Traits::length(str));
+    }
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    constexpr size_t find_first_not_of(const String& str, size_t pos = 0) const noexcept
+    {
+        return find_first_not_of(str.data(), pos, str.size());
+    }
+    constexpr size_t find_first_not_of(value_type ch, size_t pos = 0) const noexcept
+    {
+        return find_first_not_of(&ch, pos, 1);
+    }
+
+
+    // find_last_of
+
+    constexpr size_t find_last_of(const_pointer str, size_t pos, size_t count) const noexcept
+    {
+        auto it = _find_last_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
+        auto r = std::distance(begin(), it);
+        return r == size() ? npos : r;
+    }
+    constexpr size_t find_last_of(const_pointer str, size_t pos = 0) const noexcept
+    {
+        return find_last_of(str, pos, Traits::length(str));
+    }
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    constexpr size_t find_last_of(const String& str, size_t pos = 0) const noexcept
+    {
+        return find_last_of(str.data(), pos, str.size());
+    }
+    constexpr size_t find_last_of(value_type ch, size_t pos = 0) const noexcept
+    {
+        return find_last_of(&ch, pos, 1);
+    }
+
+
+    // find_last_not_of
+
+    constexpr size_t find_last_not_of(const_pointer str, size_t pos, size_t count) const noexcept
+    {
+        auto it = _find_last_not_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
+        auto r = std::distance(begin(), it);
+        return r == size() ? npos : r;
+    }
+    constexpr size_t find_last_not_of(const_pointer str, size_t pos = 0) const noexcept
+    {
+        return find_last_not_of(str, pos, Traits::length(str));
+    }
+    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    constexpr size_t find_last_not_of(const String& str, size_t pos = 0) const noexcept
+    {
+        return find_last_not_of(str.data(), pos, str.size());
+    }
+    constexpr size_t find_last_not_of(value_type ch, size_t pos = 0) const noexcept
+    {
+        return find_last_not_of(&ch, pos, 1);
     }
 
 
@@ -600,6 +710,76 @@ protected:
         // data_ changes if insert() causes allocation. in that case, first is no longer valid.
         do_copy(begin() + d);
         return *this;
+    }
+
+    template <class Iter1, class Iter2, class Cond>
+    static constexpr Iter1 _find_first_of(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2, Cond&& cond)
+    {
+        auto pos = first1;
+        for (; pos != last1; ++pos) {
+            for (auto mid = first2; mid != last2; ++mid) {
+                if (cond(*pos, *mid)) {
+                    return pos;
+                }
+            }
+        }
+        return pos;
+    }
+
+    template <class Iter1, class Iter2, class Cond>
+    static constexpr Iter1 _find_first_not_of(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2, Cond&& cond)
+    {
+        auto pos = first1;
+        for (; pos != last1; ++pos) {
+            bool found = false;
+            for (auto mid = first2; mid != last2; ++mid) {
+                if (cond(*pos, *mid)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return pos;
+            }
+        }
+        return pos;
+    }
+
+    template <class Iter1, class Iter2, class Cond>
+    static constexpr Iter1 _find_last_of(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2, Cond&& cond)
+    {
+        --first1;
+        --last1;
+        auto pos = last1;
+        for (; pos != first1; --pos) {
+            for (auto mid = first2; mid != last2; ++mid) {
+                if (cond(*pos, *mid)) {
+                    return pos;
+                }
+            }
+        }
+        return pos;
+    }
+
+    template <class Iter1, class Iter2, class Cond>
+    static constexpr Iter1 _find_last_not_of(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2, Cond&& cond)
+    {
+        --first1;
+        --last1;
+        auto pos = last1;
+        for (; pos != first1; --pos) {
+            bool found = false;
+            for (auto mid = first2; mid != last2; ++mid) {
+                if (cond(*pos, *mid)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return pos;
+            }
+        }
+        return pos;
     }
 };
 

@@ -8,10 +8,25 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <random>
 
-#ifdef _WIN32
+#if defined(_M_IX86) || defined(__i386__)
+#   define fc_x84
+#elif defined(_M_X64) || defined(__x86_64__)
+#   define fc_x84
+#   define fc_x84_64
+#endif
+
+#ifdef fc_x84
 #   include <nmmintrin.h>
 #endif
+
+#ifdef __clang__
+#   define fc_no_sanitize_address __attribute__((no_sanitize_address))
+#elif _MSC_VER
+#   define fc_no_sanitize_address __declspec(no_sanitize_address)
+#endif
+
 
 using test::Timer;
 using string = ist::string;
@@ -440,92 +455,6 @@ testCase(test_constant_iterator)
 }
 
 
-
-#ifdef _WIN32
-
-__declspec(noinline)
-bool streq_strcmp(const char* a, const char* b, size_t len)
-{
-    return std::strcmp(a, b) == 0;
-}
-
-__declspec(noinline)
-bool streq_strncmp(const char* a, const char* b, size_t len)
-{
-    return std::strncmp(a, b, len) == 0;
-}
-
-__declspec(noinline)
-bool streq_memcmp(const char* a, const char* b, size_t len)
-{
-    return memcmp(a, b, len) == 0;
-}
-
-// len must be multiples of 8
-__declspec(noinline)
-bool streq_uint64(const char* _a, const char* _b, size_t len)
-{
-    auto a = (const uint64_t*)_a;
-    auto b = (const uint64_t*)_b;
-    size_t n = len / 8;
-    for (size_t i = 0; i < n; ++i) {
-        if (*a++ != *b++) {
-            return false;
-        }
-    }
-    return true;
-}
-
-__declspec(noinline)
-bool streq_sse42(const char* _a, const char* _b, size_t len)
-{
-    size_t remain = len;
-    auto ld = (const __m128i*)_a;
-    auto rd = (const __m128i*)_b;
-    while (remain > 0)
-    {
-        int cmpcount = std::min<int>(remain, 16);
-        __m128i l128 = _mm_loadu_si128(ld++);
-        __m128i r128 = _mm_loadu_si128(rd++);
-        int r = _mm_cmpestri(l128, cmpcount, r128, cmpcount, _SIDD_CMP_EQUAL_ORDERED);
-        if (r != 0) {
-            return false;
-        }
-        remain -= cmpcount;
-    }
-    return true;
-}
-
-__declspec(noinline)
-bool strcmp_stdc(const char* _a, const char* _b, size_t len)
-{
-    return std::char_traits<char>::compare(_a, _b, len);
-}
-
-__declspec(noinline)
-bool strcmp_sse42(const char* _a, const char* _b, size_t len)
-{
-    size_t remain = len;
-    auto ld = reinterpret_cast<const __m128i*>(_a);
-    auto rd = reinterpret_cast<const __m128i*>(_b);
-    while (remain > 0)
-    {
-        int cmpcount = std::min<int>(remain, 16);
-        __m128i l128 = _mm_loadu_si128(ld++);
-        __m128i r128 = _mm_loadu_si128(rd++);
-        int r = _mm_cmpestri(l128, cmpcount, r128, cmpcount, _SIDD_CMP_EQUAL_ORDERED);
-        if (r != 0)
-        {
-            return r;
-        }
-        remain -= cmpcount;
-    }
-    return 0;
-}
-
-
-#endif
-
 testCase(test_fixed_string)
 {
     {
@@ -586,17 +515,41 @@ testCase(test_fixed_string)
         abc += std::string_view("def");
         testExpect(abc == "12345?hogeabcdef");
 
-        auto pos = abc.find("345");
-        testExpect(abc[pos] == '3');
+        auto check_pos = [&](size_t pos, char v) {
+            return abc[pos] == v;
+        };
+        auto check_npos = [&](size_t pos) {
+            return pos == ist::string::npos;
+        };
+        testExpect(check_pos(abc.find("345"), '3'));
+        testExpect(check_npos(abc.find("678")));
+        testExpect(check_pos(abc.find_first_of("abcdef?"), '?'));
+        testExpect(check_npos(abc.find_first_of("xyz")));
+        testExpect(check_pos(abc.find_first_not_of("12345"), '?'));
+        testExpect(check_npos(abc.find_first_not_of("12345?hogeabcdef")));
+        testExpect(check_pos(abc.find_last_of("?12345"), '?'));
+        testExpect(check_npos(abc.find_last_of("xyz")));
+        testExpect(check_pos(abc.find_last_not_of("hogeabcdef"), '?'));
+        testExpect(check_npos(abc.find_last_not_of("12345?hogeabcdef")));
+
+        std::string sabc = std::string(abc);
+        testExpect(check_pos(sabc.find("345"), '3'));
+        testExpect(check_npos(sabc.find("678")));
+        testExpect(check_pos(sabc.find_first_of("abcdef?"), '?'));
+        testExpect(check_npos(sabc.find_first_of("xyz")));
+        testExpect(check_pos(sabc.find_first_not_of("12345"), '?'));
+        testExpect(check_npos(sabc.find_first_not_of("12345?hogeabcdef")));
+        testExpect(check_pos(sabc.find_last_of("?12345"), '?'));
+        testExpect(check_npos(sabc.find_last_of("xyz")));
+        testExpect(check_pos(sabc.find_last_not_of("hogeabcdef"), '?'));
+        testExpect(check_npos(sabc.find_last_not_of("12345?hogeabcdef")));
+
 
         abc.replace(abc.begin() + 3, abc.begin() + 5, "6789");
         testExpect(abc == "1236789?hogeabcdef");
 
         abc.replace(abc.find("?"), 11, std::string_view(""));
         testExpect(abc == "1236789");
-
-        pos = abc.find("345");
-        testExpect(pos == ~0);
 
         abc = abc + 'a';
         abc = std::move(abc) + 'b';
@@ -612,90 +565,5 @@ testCase(test_fixed_string)
         auto xyz = abc.substr(2, 3);
         testExpect(xyz == "xyz");
     }
-
-
-#ifdef _WIN32
-    const size_t num = 1000000;
-    //const size_t num = 500000;
-    const size_t len = 128;
-
-    std::vector<std::string> a;
-    std::vector<std::string> b;
-    a.resize(num);
-    b.resize(num);
-    for (size_t i = 0; i < num; ++i) {
-        a[i].resize(len, 0x40 + (i % 0x40));
-        b[i].resize(len, 0x80 - (i % 0x40));
-    }
-
-    printf("loop count: %zu\n", num);
-    printf("string length: %zu\n", len);
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_strncmp(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_strncmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_strcmp(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_strcmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_memcmp(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_memcmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_uint64(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_uint64(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_sse42(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_sse42(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            r += strcmp_stdc(a[i].c_str(), b[i].c_str(), len);
-        }
-        printf("strcmp_stdc(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            r += strcmp_sse42(a[i].c_str(), b[i].c_str(), len);
-        }
-        printf("strcmp_sse42(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-#endif
 }
+
