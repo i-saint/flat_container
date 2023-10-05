@@ -629,16 +629,19 @@ static inline val make_val(const T& v)
     }
 }
 
+class Iterator;
+using IteratorPtr = std::shared_ptr<Iterator>;
 class Iterable;
 using IterablePtr = std::shared_ptr<Iterable>;
 
-class Iterable
+class Iterator
 {
+friend class Iterable;
 public:
     template<typename... Args>
-    static IterablePtr create(Args&&... args)
+    static val create(Args&&... args)
     {
-        return IterablePtr(new Iterable(std::forward<Args>(args)...));
+        return val(IteratorPtr(new Iterator(std::forward<Args>(args)...)));
     }
 
     val next()
@@ -648,7 +651,7 @@ public:
 
 private:
     template<class Iter>
-    Iterable(Iter begin, Iter end)
+    Iterator(Iter begin, Iter end)
     {
         static_assert(sizeof(Iter) <= sizeof(void*)); // とりえあえずポインタと同サイズのみ受け付ける
         static_assert(std::is_trivially_destructible_v<Iter>); // デストラクタの面倒は見ない
@@ -671,8 +674,8 @@ private:
     }
 
     template<class T, std::enable_if_t<is_ranged<T>, int> = 0>
-    Iterable(const T& container)
-        : Iterable(std::begin(container), std::end(container))
+    Iterator(const T& container)
+        : Iterator(std::begin(container), std::end(container))
     {
     }
 
@@ -680,6 +683,31 @@ private:
     std::function<val()> next_;
     char buf_[sizeof(void*) * 2];
     val current_;
+};
+
+class Iterable
+{
+public: 
+    template<typename... Args>
+    static val create(Args&&... args)
+    {
+        return val(IterablePtr(new Iterable(std::forward<Args>(args)...)));
+    }
+
+    val iterator()
+    {
+        return raw_ptr(&iter_);
+    }
+
+private:
+    template<typename... Args>
+    Iterable(Args&&... args)
+        : iter_(std::forward<Args>(args)...)
+    {
+
+    }
+
+    Iterator iter_;
 };
 
 
@@ -700,7 +728,7 @@ private:
 class TestIterable
 {
 public:
-    IterablePtr iterable()
+    val getMembers() const
     {
         return Iterable::create(data_);
     }
@@ -720,9 +748,13 @@ static void __testfunc(val a) {
 EMSCRIPTEN_BINDINGS(test)
 {
     using namespace emscripten;
+    class_<Iterator>("Iterator")
+        .smart_ptr<IteratorPtr>("IteratorPtr")
+        .function("next", &Iterator::next)
+        ;
     class_<Iterable>("Iterable")
         .smart_ptr<IterablePtr>("IterablePtr")
-        .function("next", &Iterable::next)
+        .function("@@iterator", &Iterable::iterator)
         ;
 
     class_<TestData>("TestData")
@@ -731,7 +763,7 @@ EMSCRIPTEN_BINDINGS(test)
         ;
     class_<TestIterable>("TestIterable")
         .constructor()
-        .function("@@iterator", &TestIterable::iterable)
+        .property("members", &TestIterable::getMembers)
         ;
     function("__testfunc", &__testfunc);
 }
