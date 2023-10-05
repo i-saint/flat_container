@@ -641,7 +641,9 @@ public:
     template<typename... Args>
     static val create(Args&&... args)
     {
-        return val(IteratorPtr(new Iterator(std::forward<Args>(args)...)));
+        auto* r = new Iterator(std::forward<Args>(args)...);
+        r->on_done_ = [r]() { delete r; };
+        return raw_ptr(r);
     }
 
     val next()
@@ -665,11 +667,14 @@ private:
             Iter& end = holder[1];
             if (p != end) {
                 current_.set("value", make_val(*p++));
+                return current_;
             }
             else {
-                current_.set("done", true);
+                val tmp = std::move(current_);
+                tmp.set("done", true);
+                on_done_();
+                return tmp;
             }
-            return current_;
         };
     }
 
@@ -681,6 +686,7 @@ private:
 
 private:
     std::function<val()> next_;
+    std::function<void()> on_done_;
     char buf_[sizeof(void*) * 2];
     val current_;
 };
@@ -691,7 +697,9 @@ public:
     template<typename... Args>
     static val create(Args&&... args)
     {
-        return val(IterablePtr(new Iterable(std::forward<Args>(args)...)));
+        auto* r = new Iterable(std::forward<Args>(args)...);
+        r->iter_.on_done_ = [r]() { delete r; };
+        return raw_ptr(r);
     }
 
     val iterator()
@@ -704,7 +712,6 @@ private:
     Iterable(Args&&... args)
         : iter_(std::forward<Args>(args)...)
     {
-
     }
 
     Iterator iter_;
