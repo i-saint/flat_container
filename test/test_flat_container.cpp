@@ -10,6 +10,13 @@
 #include <unordered_map>
 #include <random>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/val.h>
+#include <emscripten/bind.h>
+#endif // __EMSCRIPTEN__
+
+
 #if defined(_M_IX86) || defined(__i386__)
 #   define fc_x84
 #elif defined(_M_X64) || defined(__x86_64__)
@@ -567,3 +574,188 @@ testCase(test_fixed_string)
     }
 }
 
+
+#ifdef __EMSCRIPTEN__
+using emscripten::val;
+
+
+
+template <typename T> constexpr bool is_std_string = false;
+template <typename... Args> constexpr bool is_std_string<std::basic_string<Args...>> = true;
+
+template <typename T> constexpr bool is_std_unique_ptr = false;
+template <typename... Args> constexpr bool is_std_unique_ptr<std::unique_ptr<Args...>> = true;
+
+template <typename T> constexpr bool is_std_shared_ptr = false;
+template <typename... Args> constexpr bool is_std_shared_ptr<std::shared_ptr<Args...>> = true;
+
+template <typename T, typename = void>
+constexpr bool is_ranged = false;
+template <typename T>
+constexpr bool is_ranged<T, std::void_t<decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>> = true;
+
+template<typename T>
+static inline val raw_ptr(const T* p)
+{
+    using namespace emscripten;
+    return p ?
+        val::take_ownership(internal::_emval_take_value(internal::TypeID<T>::get(), &p)) :
+        val::null();
+}
+
+template<class T>
+static inline val make_val(const T& v)
+{
+    if constexpr (std::is_arithmetic_v<T>) {
+        if constexpr (std::is_integral_v<T> && sizeof(T) >= 8) {
+            // 64 bit int require explicit conversion
+            return val((double)v);
+        }
+        else {
+            return val(v);
+        }
+    }
+    else if constexpr (is_std_string<T>) {
+        return val(v);
+    }
+    else if constexpr (is_std_unique_ptr<T> || is_std_shared_ptr<T>) {
+        return raw_ptr(v.get());
+    }
+    else if constexpr (std::is_pointer_v<T>) {
+        return raw_ptr(v);
+    }
+    else {
+        return raw_ptr(&v);
+    }
+}
+
+class Iterable;
+using IterablePtr = std::shared_ptr<Iterable>;
+
+class Iterable
+{
+public:
+    template<typename... Args>
+    static IterablePtr create(Args&&... args)
+    {
+        return IterablePtr(new Iterable(std::forward<Args>(args)...));
+    }
+
+    val next()
+    {
+        return next_();
+    }
+
+private:
+    template<class Iter>
+    Iterable(Iter begin, Iter end)
+    {
+        static_assert(sizeof(Iter) <= sizeof(void*)); // とりえあえずポインタと同サイズのみ受け付ける
+        static_assert(std::is_trivially_destructible_v<Iter>); // デストラクタの面倒は見ない
+
+        Iter* holder = new (buf_) Iter[2]{ begin, end };
+        current_ = val::object();
+        current_.set("done", false);
+
+        next_ = [this, holder]() {
+            Iter& p = holder[0];
+            Iter& end = holder[1];
+            if (p != end) {
+                current_.set("value", make_val(*p++));
+            }
+            else {
+                current_.set("done", true);
+            }
+            return current_;
+        };
+    }
+
+    template<class T, std::enable_if_t<is_ranged<T>, int> = 0>
+    Iterable(const T& container)
+        : Iterable(std::begin(container), std::end(container))
+    {
+    }
+
+private:
+    std::function<val()> next_;
+    char buf_[sizeof(void*) * 2];
+    val current_;
+};
+
+
+class TestData
+{
+public:
+    TestData(int v = 0) : data_(v) {}
+
+    void test()
+    {
+        printf("TestData::test(): %d\n", data_);
+    }
+
+private:
+    int data_ = 0;
+};
+
+class TestIterable
+{
+public:
+    IterablePtr iterable()
+    {
+        return Iterable::create(data_);
+    }
+
+private:
+    TestData data_[8]{ 100, 101, 102, 103, 104, 105, 106, 107 };
+};
+
+
+static void __testfunc(val a) {
+    using namespace emscripten;
+    TestData* hogep = a.as<TestData*>(allow_raw_pointers());
+    hogep->test();
+};
+
+
+EMSCRIPTEN_BINDINGS(test)
+{
+    using namespace emscripten;
+    class_<Iterable>("Iterable")
+        .smart_ptr<IterablePtr>("IterablePtr")
+        .function("next", &Iterable::next)
+        ;
+
+    class_<TestData>("TestData")
+        .constructor<int>()
+        .function("test", &TestData::test)
+        ;
+    class_<TestIterable>("TestIterable")
+        .constructor()
+        .function("@@iterator", &TestIterable::iterable)
+        ;
+    function("__testfunc", &__testfunc);
+}
+
+testCase(test_ems_iterable)
+{
+    using namespace emscripten;
+
+    {
+        TestData hoge(42);
+        val hogev = raw_ptr(&hoge);
+        TestData* hogep = hogev.as<TestData*>(allow_raw_pointers());
+        hogep->test();
+    }
+    {
+        val obj{ TestData(43) };
+        obj.call<void>("test");
+        TestData* hogep = obj.as<TestData*>(allow_raw_pointers());
+        hogep->test();
+
+
+        obj.set("test2", val::module_property("__testfunc"));
+        obj.call<void>("test2", obj);
+    }
+}
+
+#endif // __EMSCRIPTEN__
