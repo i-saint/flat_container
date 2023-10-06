@@ -584,6 +584,13 @@ public:
         printf("TestData::test(): %d\n", data_);
     }
 
+    val getFunc()
+    {
+        return make_function([](val arg) {
+            printf("lambda(): %lf\n", arg.as<double>());
+            });
+    }
+
 private:
     int data_ = 0;
 };
@@ -614,12 +621,12 @@ EMSCRIPTEN_BINDINGS(test)
     class_<TestData>("TestData")
         .constructor<int>()
         .function("test", &TestData::test)
+        .function("getFunc", &TestData::getFunc)
         ;
     class_<TestIterable>("TestIterable")
         .constructor()
         .property("members", &TestIterable::getMembers)
         ;
-    function("__testfunc", &__testfunc);
 }
 
 testCase(test_ems_iterable)
@@ -639,8 +646,8 @@ testCase(test_ems_iterable)
         hogep->test();
 
 
-        obj.set("test2", val::module_property("__testfunc"));
-        obj.call<void>("test2", obj);
+        obj.set("test2", make_function([](val obj) { __testfunc(obj);  }));
+        obj["test2"].call<void>("call", obj);
     }
 }
 

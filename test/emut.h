@@ -146,7 +146,7 @@ private:
 
 
 template<class Iter>
-static val make_iterator(Iter begin, Iter end)
+inline val make_iterator(Iter begin, Iter end)
 {
     auto* r = new Iterator<Iter>(begin, end);
     r->setOnDone([r]() { delete r; });
@@ -154,14 +154,14 @@ static val make_iterator(Iter begin, Iter end)
 }
 
 template<class Container, std::enable_if_t<is_ranged<Container>, int> = 0>
-static val make_iterator(const Container& cont)
+inline val make_iterator(const Container& cont)
 {
     return make_iterator(std::begin(cont), std::end(cont));
 }
 
 
 template<class Iter>
-static val make_iterable(Iter begin, Iter end)
+inline val make_iterable(Iter begin, Iter end)
 {
     auto* r = new Iterable<Iter>(begin, end);
     r->setOnDone([r]() { delete r; });
@@ -169,9 +169,23 @@ static val make_iterable(Iter begin, Iter end)
 }
 
 template<class Container, std::enable_if_t<is_ranged<Container>, int> = 0>
-static val make_iterable(const Container& cont)
+inline val make_iterable(const Container& cont)
 {
     return make_iterable(std::begin(cont), std::end(cont));
+}
+
+
+template<class Func>
+inline val make_function(Func&& func)
+{
+    static struct regist {
+        regist() {
+            emscripten::class_<Func>(typeid(Func).name())
+                .function("call", &Func::operator())
+                ;
+        }
+    } regist_;
+    return val(std::move(func));
 }
 
 } // namespace emut
