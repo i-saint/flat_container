@@ -18,14 +18,9 @@ template <typename... Args> constexpr bool is_std_unique_ptr<std::unique_ptr<Arg
 template <typename T> constexpr bool is_std_shared_ptr = false;
 template <typename... Args> constexpr bool is_std_shared_ptr<std::shared_ptr<Args...>> = true;
 
-template <typename T, typename = void>
-constexpr bool is_ranged = false;
-template <typename T>
-constexpr bool is_ranged<T, std::void_t<decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>> = true;
-
 
 template<typename T>
-static inline val raw_ptr(const T* p)
+inline val make_pointer(const T* p)
 {
     using namespace emscripten;
     return p ?
@@ -33,18 +28,18 @@ static inline val raw_ptr(const T* p)
         val::null();
 }
 template<typename T>
-static inline val raw_ptr(const std::shared_ptr<T>& p)
+inline val make_pointer(const std::shared_ptr<T>& p)
 {
-    return raw_ptr(p.get());
+    return make_pointer(p.get());
 }
 template<typename T>
-static inline val raw_ptr(const std::unique_ptr<T>& p)
+inline val make_pointer(const std::unique_ptr<T>& p)
 {
-    return raw_ptr(p.get());
+    return make_pointer(p.get());
 }
 
 template<class T>
-static inline val make_val(const T& v)
+inline val make_val(const T& v)
 {
     if constexpr (std::is_arithmetic_v<T>) {
         if constexpr (std::is_integral_v<T> && sizeof(T) >= 8) {
@@ -59,10 +54,10 @@ static inline val make_val(const T& v)
         return val(v);
     }
     else if constexpr (is_std_unique_ptr<T> || is_std_shared_ptr<T> || std::is_pointer_v<T>) {
-        return raw_ptr(v);
+        return make_pointer(v);
     }
     else {
-        return raw_ptr(&v);
+        return make_pointer(&v);
     }
 }
 
@@ -130,7 +125,7 @@ public:
 
     val iterator()
     {
-        return raw_ptr(&iter_);
+        return make_pointer(&iter_);
     }
 
     template<class Func>
@@ -144,13 +139,17 @@ private:
 };
 
 
+template <typename T, typename = void>
+constexpr bool is_ranged = false;
+template <typename T>
+constexpr bool is_ranged<T, std::void_t<decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>> = true;
 
 template<class Iter>
 inline val make_iterator(Iter begin, Iter end)
 {
     auto* r = new Iterator<Iter>(begin, end);
     r->setOnDone([r]() { delete r; });
-    return raw_ptr(r);
+    return make_pointer(r);
 }
 
 template<class Container, std::enable_if_t<is_ranged<Container>, int> = 0>
@@ -165,7 +164,7 @@ inline val make_iterable(Iter begin, Iter end)
 {
     auto* r = new Iterable<Iter>(begin, end);
     r->setOnDone([r]() { delete r; });
-    return raw_ptr(r);
+    return make_pointer(r);
 }
 
 template<class Container, std::enable_if_t<is_ranged<Container>, int> = 0>
@@ -181,7 +180,7 @@ inline val make_function(Func&& func)
     static struct regist {
         regist() {
             emscripten::class_<Func>(typeid(Func).name())
-                .function("call", &Func::operator())
+                .function("call", &Func::operator()) // operator overloading はないので call() で代用
                 ;
         }
     } regist_;

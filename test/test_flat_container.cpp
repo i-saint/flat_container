@@ -635,7 +635,7 @@ testCase(test_ems_iterable)
 
     {
         TestData hoge(42);
-        val hogev = raw_ptr(&hoge);
+        val hogev = make_pointer(&hoge);
         TestData* hogep = hogev.as<TestData*>(allow_raw_pointers());
         hogep->test();
     }
