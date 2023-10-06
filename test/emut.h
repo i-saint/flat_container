@@ -1,5 +1,6 @@
 #pragma once
 #ifdef __EMSCRIPTEN__
+#include <typeinfo>
 #include <emscripten.h>
 #include <emscripten/val.h>
 #include <emscripten/bind.h>
@@ -65,77 +66,66 @@ static inline val make_val(const T& v)
     }
 }
 
-class Iterator;
-using IteratorPtr = std::shared_ptr<Iterator>;
-class Iterable;
-using IterablePtr = std::shared_ptr<Iterable>;
-
+template<class Iter>
 class Iterator
 {
-    friend class Iterable;
 public:
-    template<typename... Args>
-    static val create(Args&&... args)
+    Iterator(Iter begin, Iter end) :
+        begin_(begin), end_(end)
     {
-        auto* r = new Iterator(std::forward<Args>(args)...);
-        r->on_done_ = [r]() { delete r; };
-        return raw_ptr(r);
+        static struct regist {
+            regist() {
+                emscripten::class_<Iterator>(typeid(Iterator).name())
+                    .function("next", &Iterator::next)
+                    ;
+            }
+        } regist_;
+
+        current_ = val::object();
+        current_.set("done", false);
     }
 
     val next()
     {
-        return next_();
+        if (begin_ != end_) {
+            current_.set("value", make_val(*begin_++));
+            return current_;
+        }
+        else {
+            // on_done_() „ÅßËá™Ë∫´„ÅåÁ†¥Ê£Ñ„Åï„Çå„Çã„ÅÆ„Åß current_ „Çí move „Åó„Å¶„Åä„Åè
+            val tmp = std::move(current_);
+            tmp.set("done", true);
+            on_done_();
+            return tmp;
+        }
+    }
+
+    template<class Func>
+    void setOnDone(Func&& f)
+    {
+        on_done_ = std::move(f);
     }
 
 private:
-    template<class Iter>
-    Iterator(Iter begin, Iter end)
-    {
-        static_assert(sizeof(Iter) <= sizeof(void*)); // Ç∆ÇËÇ¶Ç†Ç¶Ç∏É|ÉCÉìÉ^Ç∆ìØÉTÉCÉYÇÃÇ›éÛÇØïtÇØÇÈ
-        static_assert(std::is_trivially_destructible_v<Iter>); // ÉfÉXÉgÉâÉNÉ^ÇÃñ ì|ÇÕå©Ç»Ç¢
-
-        Iter* holder = new (buf_) Iter[2]{ begin, end };
-        current_ = val::object();
-        current_.set("done", false);
-
-        next_ = [this, holder]() {
-            Iter& p = holder[0];
-            Iter& end = holder[1];
-            if (p != end) {
-                current_.set("value", make_val(*p++));
-                return current_;
-            }
-            else {
-                val tmp = std::move(current_);
-                tmp.set("done", true);
-                on_done_();
-                return tmp;
-            }
-        };
-    }
-
-    template<class T, std::enable_if_t<is_ranged<T>, int> = 0>
-    Iterator(const T& container)
-        : Iterator(std::begin(container), std::end(container))
-    {
-    }
-
-private:
-    std::function<val()> next_;
+    Iter begin_, end_;
     std::function<void()> on_done_;
-    char buf_[sizeof(void*) * 2];
     val current_;
 };
 
+template<class Iter>
 class Iterable
 {
 public:
-    template<typename... Args>
-    static val create(Args&&... args)
+    Iterable(Iter begin, Iter end)
+        : iter_(begin, end)
     {
-        auto* r = new Iterable(std::forward<Args>(args)...);
-        r->iter_.on_done_ = [r]() { delete r; };
-        return raw_ptr(r);
+        static struct regist {
+            regist() {
+                emscripten::class_<Iterable>(typeid(Iterable).name())
+                    .function("@@iterator", &Iterable::iterator)
+                    ;
+            }
+        } regist_;
     }
 
     val iterator()
@@ -143,15 +133,46 @@ public:
         return raw_ptr(&iter_);
     }
 
-private:
-    template<typename... Args>
-    Iterable(Args&&... args)
-        : iter_(std::forward<Args>(args)...)
+    template<class Func>
+    void setOnDone(Func&& f)
     {
+        iter_.setOnDone(std::move(f));
     }
 
-    Iterator iter_;
+private:
+    Iterator<Iter> iter_;
 };
+
+
+
+template<class Iter>
+static val make_iterator(Iter begin, Iter end)
+{
+    auto* r = new Iterator<Iter>(begin, end);
+    r->setOnDone([r]() { delete r; });
+    return raw_ptr(r);
+}
+
+template<class Container, std::enable_if_t<is_ranged<Container>, int> = 0>
+static val make_iterator(const Container& cont)
+{
+    return make_iterator(std::begin(cont), std::end(cont));
+}
+
+
+template<class Iter>
+static val make_iterable(Iter begin, Iter end)
+{
+    auto* r = new Iterable<Iter>(begin, end);
+    r->setOnDone([r]() { delete r; });
+    return raw_ptr(r);
+}
+
+template<class Container, std::enable_if_t<is_ranged<Container>, int> = 0>
+static val make_iterable(const Container& cont)
+{
+    return make_iterable(std::begin(cont), std::end(cont));
+}
 
 } // namespace emut
 #endif // __EMSCRIPTEN__

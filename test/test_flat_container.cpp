@@ -593,7 +593,7 @@ class TestIterable
 public:
     val getMembers() const
     {
-        return Iterable::create(data_);
+        return make_iterable(data_);
     }
 
 private:
