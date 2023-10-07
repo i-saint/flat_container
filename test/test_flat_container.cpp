@@ -8,10 +8,27 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <random>
+#include "emut.h"
 
-#ifdef _WIN32
+
+#if defined(_M_IX86) || defined(__i386__)
+#   define fc_x84
+#elif defined(_M_X64) || defined(__x86_64__)
+#   define fc_x84
+#   define fc_x84_64
+#endif
+
+#ifdef fc_x84
 #   include <nmmintrin.h>
 #endif
+
+#ifdef __clang__
+#   define fc_no_sanitize_address __attribute__((no_sanitize_address))
+#elif _MSC_VER
+#   define fc_no_sanitize_address __declspec(no_sanitize_address)
+#endif
+
 
 using test::Timer;
 using string = ist::string;
@@ -440,63 +457,6 @@ testCase(test_constant_iterator)
 }
 
 
-
-#ifdef _WIN32
-
-__declspec(noinline)
-bool streq_strcmp(const char* a, const char* b, size_t len)
-{
-    return std::strcmp(a, b) == 0;
-}
-
-__declspec(noinline)
-bool streq_strncmp(const char* a, const char* b, size_t len)
-{
-    return std::strncmp(a, b, len) == 0;
-}
-
-__declspec(noinline)
-bool streq_memcmp(const char* a, const char* b, size_t len)
-{
-    return memcmp(a, b, len) == 0;
-}
-
-// len must be multiples of 8
-__declspec(noinline)
-bool streq_uint64(const char* _a, const char* _b, size_t len)
-{
-    auto a = (const uint64_t*)_a;
-    auto b = (const uint64_t*)_b;
-    size_t n = len / 8;
-    for (size_t i = 0; i < n; ++i) {
-        if (*a++ != *b++) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// len must be multiples of 16
-__declspec(noinline)
-bool streq_sse42(const char* _a, const char* _b, size_t len)
-{
-    auto a = (const __m128i*)_a;
-    auto b = (const __m128i*)_b;
-    size_t n = len / 16;
-    for (size_t i = 0; i < n; ++i) {
-        int r = _mm_cmpestri(
-            _mm_loadu_si128(a++), 16,
-            _mm_loadu_si128(b++), 16,
-            _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ORDERED);
-        //printf("%d\n", r);
-        if (r != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-#endif
-
 testCase(test_fixed_string)
 {
     {
@@ -557,17 +517,41 @@ testCase(test_fixed_string)
         abc += std::string_view("def");
         testExpect(abc == "12345?hogeabcdef");
 
-        auto pos = abc.find("345");
-        testExpect(abc[pos] == '3');
+        auto check_pos = [&](size_t pos, char v) {
+            return abc[pos] == v;
+        };
+        auto check_npos = [&](size_t pos) {
+            return pos == ist::string::npos;
+        };
+        testExpect(check_pos(abc.find("345"), '3'));
+        testExpect(check_npos(abc.find("678")));
+        testExpect(check_pos(abc.find_first_of("abcdef?"), '?'));
+        testExpect(check_npos(abc.find_first_of("xyz")));
+        testExpect(check_pos(abc.find_first_not_of("12345"), '?'));
+        testExpect(check_npos(abc.find_first_not_of("12345?hogeabcdef")));
+        testExpect(check_pos(abc.find_last_of("?12345"), '?'));
+        testExpect(check_npos(abc.find_last_of("xyz")));
+        testExpect(check_pos(abc.find_last_not_of("hogeabcdef"), '?'));
+        testExpect(check_npos(abc.find_last_not_of("12345?hogeabcdef")));
+
+        std::string sabc = std::string(abc);
+        testExpect(check_pos(sabc.find("345"), '3'));
+        testExpect(check_npos(sabc.find("678")));
+        testExpect(check_pos(sabc.find_first_of("abcdef?"), '?'));
+        testExpect(check_npos(sabc.find_first_of("xyz")));
+        testExpect(check_pos(sabc.find_first_not_of("12345"), '?'));
+        testExpect(check_npos(sabc.find_first_not_of("12345?hogeabcdef")));
+        testExpect(check_pos(sabc.find_last_of("?12345"), '?'));
+        testExpect(check_npos(sabc.find_last_of("xyz")));
+        testExpect(check_pos(sabc.find_last_not_of("hogeabcdef"), '?'));
+        testExpect(check_npos(sabc.find_last_not_of("12345?hogeabcdef")));
+
 
         abc.replace(abc.begin() + 3, abc.begin() + 5, "6789");
         testExpect(abc == "1236789?hogeabcdef");
 
         abc.replace(abc.find("?"), 11, std::string_view(""));
         testExpect(abc == "1236789");
-
-        pos = abc.find("345");
-        testExpect(pos == ~0);
 
         abc = abc + 'a';
         abc = std::move(abc) + 'b';
@@ -583,73 +567,88 @@ testCase(test_fixed_string)
         auto xyz = abc.substr(2, 3);
         testExpect(xyz == "xyz");
     }
-
-
-#ifdef _WIN32
-    const size_t num = 1000000;
-    //const size_t num = 500000;
-    const size_t len = 128;
-
-    std::vector<std::string> a;
-    std::vector<std::string> b;
-    a.resize(num);
-    b.resize(num);
-    for (size_t i = 0; i < num; ++i) {
-        a[i].resize(len, 0x40 + (i % 0x40));
-        b[i].resize(len, 0x80 - (i % 0x40));
-    }
-
-    printf("loop count: %zu\n", num);
-    printf("string length: %zu\n", len);
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_strncmp(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_strncmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_strcmp(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_strcmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_memcmp(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_memcmp(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_uint64(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_uint64(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-    {
-        Timer timer;
-        int r = 0;
-        for (uint64_t i = 0; i < num; ++i) {
-            if (streq_sse42(a[i].c_str(), b[i].c_str(), len)) {
-                ++r;
-            }
-        }
-        printf("streq_sse42(): %.2lfms %d\n", timer.elapsed_ms(), r);
-    }
-#endif
 }
+
+
+#ifdef __EMSCRIPTEN__
+using namespace emut;
+
+
+class TestData
+{
+public:
+    TestData(int v = 0) : data_(v) {}
+
+    void test()
+    {
+        printf("TestData::test(): %d\n", data_);
+    }
+
+    val getFunc()
+    {
+        return make_function([](val arg) {
+            printf("lambda(): %lf\n", arg.as<double>());
+            });
+    }
+
+private:
+    int data_ = 0;
+};
+
+class TestIterable
+{
+public:
+    val getMembers() const
+    {
+        return make_iterable(data_);
+    }
+
+private:
+    TestData data_[8]{ 100, 101, 102, 103, 104, 105, 106, 107 };
+};
+
+
+static void __testfunc(val a) {
+    using namespace emscripten;
+    TestData* hogep = a.as<TestData*>(allow_raw_pointers());
+    hogep->test();
+};
+
+
+EMSCRIPTEN_BINDINGS(test)
+{
+    using namespace emscripten;
+    class_<TestData>("TestData")
+        .constructor<int>()
+        .function("test", &TestData::test)
+        .function("getFunc", &TestData::getFunc)
+        ;
+    class_<TestIterable>("TestIterable")
+        .constructor()
+        .property("members", &TestIterable::getMembers)
+        ;
+}
+
+testCase(test_ems_iterable)
+{
+    using namespace emscripten;
+
+    {
+        TestData hoge(42);
+        val hogev = make_pointer(&hoge);
+        TestData* hogep = hogev.as<TestData*>(allow_raw_pointers());
+        hogep->test();
+    }
+    {
+        val obj{ TestData(43) };
+        obj.call<void>("test");
+        TestData* hogep = obj.as<TestData*>(allow_raw_pointers());
+        hogep->test();
+
+
+        obj.set("test2", make_function([](val obj) { __testfunc(obj);  }));
+        obj["test2"].call<void>("call", obj);
+    }
+}
+
+#endif // __EMSCRIPTEN__

@@ -316,7 +316,7 @@ using mapped_set = basic_set<Key, Compare, mapped_vector<Key>>;
 namespace std {
 
 template<class K, class Comp, class Cont>
-void swap(ist::basic_set<K, Comp, Cont>& l, ist::basic_set<K, Comp, Cont>& r) noexcept
+inline void swap(ist::basic_set<K, Comp, Cont>& l, ist::basic_set<K, Comp, Cont>& r) noexcept
 {
     l.swap(r);
 }

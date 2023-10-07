@@ -154,11 +154,11 @@ protected:
         }
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
-    constexpr void _copy_range(iterator dst, Iter first, Iter last)
+    template<class Iter, class MaybeOverlapped = std::false_type, fc_require(is_iterator_v<Iter, value_type>)>
+    constexpr void _copy_range(iterator dst, Iter first, Iter last, MaybeOverlapped = {})
     {
         if constexpr (is_pod_v<value_type>) {
-            if constexpr (std::is_pointer_v<Iter>) {
+            if constexpr (std::is_pointer_v<Iter> && !MaybeOverlapped::value) {
                 std::memcpy(dst, first, sizeof(value_type) * std::distance(first, last));
             }
             else {
