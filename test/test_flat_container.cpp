@@ -4,6 +4,7 @@
 #include "flat_container/raw_vector.h"
 #include "flat_container/vector.h"
 #include "flat_container/string.h"
+#include "flat_container/memory_view_stream.h"
 #include <set>
 #include <map>
 #include <memory>
@@ -584,6 +585,11 @@ public:
         printf("TestData::test(): %d\n", data_);
     }
 
+    void test2(val arg)
+    {
+        printf("TestData::test(): %d %lf\n", data_, arg.as<double>());
+    }
+
     val getFunc()
     {
         return make_function([](val arg) {
@@ -621,6 +627,7 @@ EMSCRIPTEN_BINDINGS(test)
     class_<TestData>("TestData")
         .constructor<int>()
         .function("test", &TestData::test)
+        .function("test2", &TestData::test2)
         .function("getFunc", &TestData::getFunc)
         ;
     class_<TestIterable>("TestIterable")
