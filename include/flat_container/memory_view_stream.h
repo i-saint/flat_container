@@ -144,20 +144,17 @@ memory_view_streambuf::underflow()
     char* head = data_;
     char* tail = head + size_;
     char* cur = this->gptr();
-    if (cur < tail)
-    {
+    if (cur < tail) {
         // buffer is not exhausted yet. just update position.
         int ret = *cur++;
         this->setg(cur, cur, tail);
         return ret;
     }
-    else
-    {
+    else {
         // call underflow handler. update buffer and position if handled properly.
         if (on_underflow_ && on_underflow_(data_, size_, cur)) {
-            int ret = *cur++;
             this->setg(cur, cur, tail);
-            return ret;
+            return 0;
         }
         else {
             return traits_type::eof();
@@ -171,14 +168,12 @@ memory_view_streambuf::overflow(int c)
     char* head = data_;
     char* tail = head + size_;
     char* cur = this->pptr();
-    if (cur < tail)
-    {
+    if (cur < tail) {
         // buffer is not exhausted yet. just update position.
         *cur++ = (char)c;
         this->setp(cur, tail);
     }
-    else
-    {
+    else {
         // call overflow handler. update buffer and position if handled properly.
         size_t old = size_;
         if (on_overflow_ && on_overflow_(data_, size_)) {
@@ -193,7 +188,10 @@ memory_view_streambuf::overflow(int c)
     return c;
 }
 
-// implementation of read()
+// std::streambuf implements xsgetn() and xsputn().
+// but MSVC's has a problem when count > INT_MAX.
+// so we implement our own.
+
 inline std::streamsize
 memory_view_streambuf::xsgetn(char* dst, std::streamsize count)
 {
@@ -214,7 +212,6 @@ memory_view_streambuf::xsgetn(char* dst, std::streamsize count)
             if (underflow() == traits_type::eof()) {
                 return count - remain;
             }
-            --remain;
             head = data_;
             tail = data_ + size_;
             src = this->gptr();
@@ -223,7 +220,6 @@ memory_view_streambuf::xsgetn(char* dst, std::streamsize count)
     return count;
 }
 
-// implementation of write()
 inline std::streamsize
 memory_view_streambuf::xsputn(const char* src, std::streamsize count)
 {
@@ -263,6 +259,7 @@ memory_view_streambuf::swap(memory_view_streambuf& v) noexcept
     std::swap(on_overflow_, v.on_overflow_);
     std::swap(on_destroy_, v.on_destroy_);
 }
+
 
 inline void
 memory_view_streambuf::reset(const void* data, size_t size)

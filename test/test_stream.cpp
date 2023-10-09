@@ -42,6 +42,10 @@ testCase(test_memory_view_stream)
     for (size_t i = 0; i < 128; ++i) {
         uint64_t t;
         stream.read((char*) & t, sizeof(t));
+        testExpect(t == i % 32);
         printf("%llu\n", t);
     }
+
+    ist::memory_view_stream stream2;
+    std::swap(stream, stream2);
 }
