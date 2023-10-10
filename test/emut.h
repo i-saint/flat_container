@@ -68,13 +68,13 @@ public:
     Iterator(Iter begin, Iter end) :
         begin_(begin), end_(end)
     {
-        static struct regist {
-            regist() {
+        static struct binder {
+            binder() {
                 emscripten::class_<Iterator>(typeid(Iterator).name())
                     .function("next", &Iterator::next)
                     ;
             }
-        } regist_;
+        } bind;
 
         current_ = val::object();
         current_.set("done", false);
@@ -87,7 +87,7 @@ public:
             return current_;
         }
         else {
-            // on_done_() で自身が破棄されるので current_ を move しておく
+            // move current_ before on_done_() destroys this.
             val tmp = std::move(current_);
             tmp.set("done", true);
             on_done_();
@@ -114,13 +114,13 @@ public:
     Iterable(Iter begin, Iter end)
         : iter_(begin, end)
     {
-        static struct regist {
-            regist() {
+        static struct binder {
+            binder() {
                 emscripten::class_<Iterable>(typeid(Iterable).name())
                     .function("@@iterator", &Iterable::iterator)
                     ;
             }
-        } regist_;
+        } bind;
     }
 
     val iterator()
@@ -177,13 +177,14 @@ inline val make_iterable(const Container& cont)
 template<class Func>
 inline val make_function(Func&& func)
 {
-    static struct regist {
-        regist() {
+    static struct binder {
+        binder() {
             emscripten::class_<Func>(typeid(Func).name())
-                .function("call", &Func::operator()) // operator overloading はないので call() で代用
+                // JavaScript doesn't have operator overloading. define call() in place of it.
+                .function("call", &Func::operator())
                 ;
         }
-    } regist_;
+    } bind;
     return val(std::move(func));
 }
 
