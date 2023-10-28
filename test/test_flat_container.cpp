@@ -113,53 +113,61 @@ testCase(test_flat_set)
 
 testCase(test_flat_map)
 {
-    std::map<string, int> smap;
+    std::map<string, int> stdmap;
     ist::flat_map<string, int> fmap;
     ist::fixed_map<string, int, 32> xmap;
     ist::sbo_map<string, int, 8> bmap;
 
     std::byte buf[sizeof(std::pair<string, int>) * 32];
-    ist::remote_map<string, int> vmap(buf, 32);
+    ist::remote_map<string, int> rmap(buf, 32);
+
+    ist::shared_map<string, int> smap;
 
     auto check = [&]() {
-        testExpect(smap.size() == fmap.size());
-        testExpect(smap.size() == xmap.size());
-        testExpect(smap.size() == bmap.size());
-        testExpect(smap.size() == vmap.size());
+        testExpect(stdmap.size() == fmap.size());
+        testExpect(stdmap.size() == xmap.size());
+        testExpect(stdmap.size() == bmap.size());
+        testExpect(stdmap.size() == rmap.size());
+        testExpect(stdmap.size() == smap.size());
 
-        auto i1 = smap.begin();
+        auto i1 = stdmap.begin();
         auto i2 = fmap.begin();
         auto i3 = xmap.begin();
         auto i4 = bmap.begin();
-        auto i5 = vmap.begin();
-        while (i1 != smap.end()) {
+        auto i5 = rmap.begin();
+        auto i6 = smap.begin();
+        while (i1 != stdmap.end()) {
             testExpect(i1->first == i2->first); testExpect(i1->second == i2->second);
             testExpect(i1->first == i3->first); testExpect(i1->second == i3->second);
             testExpect(i1->first == i4->first); testExpect(i1->second == i4->second);
             testExpect(i1->first == i5->first); testExpect(i1->second == i5->second);
-            ++i1; ++i2; ++i3; ++i4; ++i5;
+            testExpect(i1->first == i6->first); testExpect(i1->second == i6->second);
+            ++i1; ++i2; ++i3; ++i4; ++i5; ++i6;
         }
     };
     auto insert = [&](const std::pair<string, int>& v) {
-        smap.insert(v);
+        stdmap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
         bmap.insert(v);
-        vmap.insert(v);
+        rmap.insert(v);
+        smap.insert(v);
     };
     auto insert_il = [&](std::initializer_list<std::pair<const string, int>>&& v) {
-        smap.insert(v);
+        stdmap.insert(v);
         fmap.insert(v);
         xmap.insert(v);
         bmap.insert(v);
-        vmap.insert(v);
+        rmap.insert(v);
+        smap.insert(v);
     };
     auto erase = [&](const string& v) {
-        smap.erase(v);
+        stdmap.erase(v);
         fmap.erase(v);
         xmap.erase(v);
         bmap.erase(v);
-        vmap.erase(v);
+        rmap.erase(v);
+        smap.erase(v);
     };
 
     std::pair<string, int> data[]{

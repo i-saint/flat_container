@@ -5,6 +5,8 @@
 #include <iterator>
 #include <type_traits>
 #include <memory>
+#include <functional>
+#include <atomic>
 
 #ifdef _DEBUG
 #   if !defined(FC_ENABLE_CAPACITY_CHECK)
@@ -33,14 +35,19 @@ template <class T>
 constexpr bool is_reallocatable_v<T, std::enable_if_t<T::is_reallocatable>> = true;
 
 template <class T, class = void>
-constexpr bool have_buffer_v = false;
+constexpr bool has_inner_buffer_v = false;
 template <class T>
-constexpr bool have_buffer_v<T, std::enable_if_t<T::have_inner_buffer>> = true;
+constexpr bool has_inner_buffer_v<T, std::enable_if_t<T::has_inner_buffer>> = true;
 
 template <class T, class = void>
 constexpr bool is_remote_memory_v = false;
 template <class T>
 constexpr bool is_remote_memory_v<T, std::enable_if_t<T::is_remote_memory>> = true;
+
+template <class T, class = void>
+constexpr bool has_copy_on_write_v = false;
+template <class T>
+constexpr bool has_copy_on_write_v<T, std::enable_if_t<T::is_copy_on_write>> = true;
 
 // std::construct_at() requires c++20 so define our own.
 template<class T, class... Args>
@@ -178,9 +185,9 @@ protected:
         return size == 0 ? nullptr : allocator_type().allocate(size);
     }
 
-    void _deallocate(value_type* addr, size_t size)
+    void _deallocate(value_type* data, size_t size)
     {
-        allocator_type().deallocate(addr, size);
+        allocator_type().deallocate(data, size);
     }
 
     void _resize_capacity(size_t new_capaity)
@@ -196,7 +203,7 @@ protected:
 
         data_ = new_data;
         capacity_ = new_capaity;
-        size_ = std::min(size_, capacity_);
+        size_ = std::min(size_, new_capaity);
     }
 
 private:
@@ -211,22 +218,22 @@ class fixed_memory
 {
 public:
     using value_type = T;
-    static constexpr bool have_inner_buffer = true;
+    static constexpr bool has_inner_buffer = true;
     constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
-    fixed_memory() = default;
+    fixed_memory() {}
     fixed_memory(const fixed_memory& r) { operator=(r); }
     fixed_memory(fixed_memory&& r) noexcept { operator=(std::move(r)); }
 
     ~fixed_memory()
     {
-        std::destroy(_data(), _data() + _size());
+        std::destroy(data_, data_ + size_);
         size_ = 0;
     }
 
     fixed_memory& operator=(const fixed_memory& r)
     {
-        _copy_construct(r._data(), r._data() + r._size(), _data(), _size());
+        _copy_construct(r.data_, r.data_ + r.size_, data_, size_);
         size_ = r.size_;
         return *this;
     }
@@ -239,19 +246,21 @@ public:
 
     void swap(fixed_memory& r)
     {
-        _swap_content(_data(), _size(), r._data(), r._size());
+        _swap_content(data_, size_, r.data_, r.size_);
         std::swap(size_, r.size_);
     }
 
 protected:
-    size_t _capacity() const { return Capacity; }
+    size_t _capacity() const { return capacity_; }
     size_t& _size() { return size_; }
     size_t _size() const { return size_; }
-    value_type* _data() const { return (value_type*)buffer_; }
+    value_type* _data() const { return data_; }
     void _copy_on_write() {}
 
 private:
+    static constexpr size_t capacity_ = Capacity;
     size_t size_ = 0;
+    value_type* data_ = (value_type*)buffer_; // for debug and align
     char buffer_[sizeof(value_type) * Capacity]; // uninitialized in intention
 };
 
@@ -266,7 +275,7 @@ public:
     using value_type = T;
     using allocator_type = Allocator;
     static constexpr bool is_reallocatable = true;
-    static constexpr bool have_inner_buffer = true;
+    static constexpr bool has_inner_buffer = true;
 
     constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
@@ -330,10 +339,10 @@ protected:
         }
     }
 
-    void _deallocate(value_type* addr, size_t size)
+    void _deallocate(value_type* data, size_t size)
     {
-        if ((char*)addr != buffer_) {
-            allocator_type().deallocate(addr, size);
+        if ((char*)data != buffer_) {
+            allocator_type().deallocate(data, size);
         }
     }
 
@@ -351,7 +360,7 @@ protected:
 
         data_ = new_data;
         capacity_ = new_capaity;
-        size_ = std::min(size_, capacity_);
+        size_ = std::min(size_, new_capaity);
     }
 
 private:
@@ -432,6 +441,150 @@ private:
     size_t size_ = 0;
     T* data_ = nullptr;
 };
+
+
+template<class T, class Allocator = std::allocator<T>>
+class copy_on_write_memory
+{
+public:
+    using value_type = T;
+    using allocator_type = Allocator;
+    static constexpr bool is_reallocatable = true;
+    static constexpr bool is_remote_memory = true;
+    static constexpr bool has_copy_on_write = true;
+
+    using release_handler = std::function<void(value_type* data, size_t size, size_t capacity)>;
+
+    struct control_block
+    {
+        std::atomic<size_t> ref_count_{ 1 };
+        release_handler on_release_;
+        size_t capacity_ = 0;
+        size_t size_ = 0;
+        value_type* data_ = nullptr;
+    };
+
+
+    copy_on_write_memory()
+    {
+        control_ = new control_block();
+        control_->on_release_ = &_default_on_release;
+    }
+    copy_on_write_memory(const copy_on_write_memory& r) { operator=(r); }
+    copy_on_write_memory(copy_on_write_memory&& r) noexcept { operator=(std::move(r)); }
+
+    copy_on_write_memory(void* data, size_t capacity, size_t size = 0, release_handler&& on_release = {})
+        : copy_on_write_memory()
+    {
+        control_ = new control_block();
+        control_->data_ = data;
+        control_->capacity_ = capacity;
+        control_->size_ = size;
+        control_->on_release_ = on_release;
+    }
+
+    ~copy_on_write_memory()
+    {
+        _decref();
+    }
+
+    copy_on_write_memory& operator=(const copy_on_write_memory& r)
+    {
+        _decref();
+        control_ = r.control_;
+        control_->ref_count_++;
+        return *this;
+    }
+
+    copy_on_write_memory& operator=(copy_on_write_memory&& r) noexcept
+    {
+        swap(r);
+        return *this;
+    }
+
+    void swap(copy_on_write_memory& r)
+    {
+        std::swap(control_, r.control_);
+    }
+
+    size_t ref_count() const
+    {
+        return control_->ref_count_;
+    }
+
+protected:
+    size_t& _capacity() { return control_->capacity_; }
+    size_t _capacity() const { return control_->capacity_; }
+    size_t& _size() { return control_->size_; }
+    size_t _size() const { return control_->size_; }
+    T*& _data() { return control_->data_; }
+    T* _data() const { return control_->data_; }
+
+    static void _default_on_release(value_type* data, size_t size, size_t capacity)
+    {
+        std::destroy(data, data + size);
+        allocator_type().deallocate(data, capacity);
+    }
+
+    void _copy_on_write()
+    {
+        if (control_->ref_count_ > 1) {
+            auto old = control_;
+            auto control_ = new control_block();
+            control_->on_release_ = &_default_on_release;
+            if (old->data_) {
+                _resize_capacity(old->size_);
+                _copy_construct(old->data_, old->data_ + old->size_, control_->data_);
+            }
+        }
+    }
+
+    void _decref()
+    {
+        if (--control_->ref_count_ == 0) {
+            if (control_->on_release_) {
+                control_->on_release_(control_->data_, control_->size_, control_->capacity_);
+            }
+
+            // clear for debug
+            control_->capacity_ = control_->size_ = 0;
+            control_->data_ = nullptr;
+
+            delete control_;
+            control_ = nullptr;
+        }
+    }
+
+    value_type* _allocate(size_t size)
+    {
+        return size == 0 ? nullptr : allocator_type().allocate(size);
+    }
+
+    void _deallocate(value_type* data, size_t size)
+    {
+        allocator_type().deallocate(data, size);
+    }
+
+    void _resize_capacity(size_t new_capaity)
+    {
+        if (_capacity() == new_capaity) {
+            return;
+        }
+
+        value_type* new_data = _allocate(new_capaity);
+        _move_construct(_data(), _data() + std::min(_size(), new_capaity), new_data);
+        std::destroy(_data(), _data() + _size());
+        _deallocate(_data(), _capacity());
+
+        _data() = new_data;
+        _capacity() = new_capaity;
+        _size() = std::min(_size(), new_capaity);
+    }
+
+private:
+    control_block* control_ = nullptr;
+};
+
 
 } // namespace ist
 

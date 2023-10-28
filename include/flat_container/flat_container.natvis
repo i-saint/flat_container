@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  
   <Type Name="ist::span&lt;*&gt;">
     <DisplayString>{{ size={size_} }}</DisplayString>
     <Expand>
@@ -10,6 +11,67 @@
       </ArrayItems>
     </Expand>
   </Type>
+
+  <Type Name="ist::dynamic_memory&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">size_</Item>
+      <Item Name="[capacity]">capacity_</Item>
+      <ArrayItems>
+        <Size>size_</Size>
+        <ValuePointer>data_</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="ist::fixed_memory&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">size_</Item>
+      <Item Name="[capacity]">capacity_</Item>
+      <ArrayItems>
+        <Size>size_</Size>
+        <ValuePointer>data_</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="ist::sbo_memory&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">size_</Item>
+      <Item Name="[capacity]">capacity_</Item>
+      <ArrayItems>
+        <Size>size_</Size>
+        <ValuePointer>data_</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="ist::remote_memory&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">size_</Item>
+      <Item Name="[capacity]">capacity_</Item>
+      <ArrayItems>
+        <Size>size_</Size>
+        <ValuePointer>data_</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="ist::copy_on_write_memory&lt;*&gt;">
+    <DisplayString>{{ size={control_->size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">control_->size_</Item>
+      <Item Name="[capacity]">control_->capacity_</Item>
+      <ArrayItems>
+        <Size>control_->size_</Size>
+        <ValuePointer>control_->data_</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
   <Type Name="ist::basic_string&lt;*&gt;">
     <DisplayString>{data_,na}</DisplayString>
     <Expand>
@@ -21,28 +83,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="ist::basic_raw_vector&lt;*&gt;">
-    <DisplayString>{{ size={size_} }}</DisplayString>
-    <Expand>
-      <Item Name="[size]">size_</Item>
-      <Item Name="[capacity]">capacity_</Item>
-      <ArrayItems>
-        <Size>size_</Size>
-        <ValuePointer>data_</ValuePointer>
-      </ArrayItems>
-    </Expand>
-  </Type>
-  <Type Name="ist::basic_vector&lt;*&gt;">
-    <DisplayString>{{ size={size_} }}</DisplayString>
-    <Expand>
-      <Item Name="[size]">size_</Item>
-      <Item Name="[capacity]">capacity_</Item>
-      <ArrayItems>
-        <Size>size_</Size>
-        <ValuePointer>data_</ValuePointer>
-      </ArrayItems>
-    </Expand>
-  </Type>
+  
   <Type Name="ist::basic_set&lt;*,*,*&gt;">
     <DisplayString>{data_}</DisplayString>
     <Expand>
@@ -50,6 +91,7 @@
       <ExpandedItem>data_</ExpandedItem>
     </Expand>
   </Type>
+  
   <Type Name="ist::basic_map&lt;*,*,*,*&gt;">
     <DisplayString>{data_}</DisplayString>
     <Expand>
@@ -57,4 +99,5 @@
       <ExpandedItem>data_</ExpandedItem>
     </Expand>
   </Type>
+
 </AutoVisualizer>
