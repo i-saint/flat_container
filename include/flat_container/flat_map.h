@@ -37,18 +37,18 @@ public:
     basic_map(const container_type& v) { operator=(v); }
     basic_map(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool view = is_memory_view_v<container_type>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
+    template <class Iter, bool remote = is_remote_memory_v<container_type>, fc_require(!remote), fc_require(is_iterator_v<Iter, value_type>)>
     basic_map(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool view = is_memory_view_v<container_type>, fc_require(!view)>
+    template <bool remote = is_remote_memory_v<container_type>, fc_require(!remote)>
     basic_map(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool view = is_memory_view_v<container_type>, fc_require(view)>
+    template<bool remote = is_remote_memory_v<container_type>, fc_require(remote)>
     basic_map(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -361,17 +361,6 @@ template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
 using sbo_map = basic_map<Key, Value, Compare, sbo_vector<std::pair<Key, Value>, Capacity>>;
 
 template <class Key, class Value, class Compare = std::less<>>
-using map_view = basic_map<Key, Value, Compare, vector_view<std::pair<Key, Value>>>;
+using remote_map = basic_map<Key, Value, Compare, remote_vector<std::pair<Key, Value>>>;
 
 } // namespace ist
-
-
-namespace std {
-
-template<class K, class V, class Comp, class Cont>
-inline void swap(ist::basic_map<K, V, Comp, Cont>& l, ist::basic_map<K, V, Comp, Cont>& r) noexcept
-{
-    l.swap(r);
-}
-
-} // namespace std

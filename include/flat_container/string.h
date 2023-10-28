@@ -44,29 +44,39 @@ public:
     basic_string(const basic_string& r) { operator=(r); }
     basic_string(basic_string&& r) noexcept { operator=(std::move(r)); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
     constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
     constexpr basic_string(const_pointer v) { assign(v); }
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
     constexpr basic_string(const_pointer v, size_t n) { assign(v, n); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(!view)>
+    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
     constexpr basic_string(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, bool remote = is_remote_memory_v<super>, fc_require(!remote), fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
-    template<class String, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_string_like_v<String, value_type>)>
+    template<class String, bool remote = is_remote_memory_v<super>, fc_require(!remote), fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string(const String& str) { assign(str); }
 
-    template<bool view = is_memory_view_v<super>, fc_require(view)>
+    template<bool remote = is_remote_memory_v<super>, fc_require(remote)>
     constexpr basic_string(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
         , basic_string()
     {
     }
+    constexpr basic_string& operator=(const basic_string& r)
+    {
+        return assign(r);
+    }
+    constexpr basic_string& operator=(basic_string&& r) noexcept
+    {
+        this->swap(r);
+        return *this;
+    }
+
 
     using super::capacity;
     using super::size;
@@ -88,16 +98,6 @@ public:
 
     constexpr const_pointer c_str() const { return data(); }
     constexpr size_t length() const { return size(); }
-
-    constexpr basic_string& operator=(const basic_string& r)
-    {
-        return assign(r);
-    }
-    constexpr basic_string& operator=(basic_string&& r) noexcept
-    {
-        this->swap(r);
-        return *this;
-    }
 
     constexpr void resize(size_t n)
     {
@@ -956,28 +956,22 @@ template<size_t Capacity> using sbo_wstring = basic_string<wchar_t, sbo_memory<w
 template<size_t Capacity> using sbo_u16string = basic_string<char16_t, sbo_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
 template<size_t Capacity> using sbo_u32string = basic_string<char32_t, sbo_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
 
-using string_view = basic_string<char, memory_view<char>, std::char_traits<char>>;
-using wstring_view = basic_string<wchar_t, memory_view<wchar_t>, std::char_traits<wchar_t>>;
-using u16string_view = basic_string<char16_t, memory_view<char16_t>, std::char_traits<char16_t>>;
-using u32string_view = basic_string<char32_t, memory_view<char32_t>, std::char_traits<char32_t>>;
+using remote_string = basic_string<char, remote_memory<char>, std::char_traits<char>>;
+using remote_wstring = basic_string<wchar_t, remote_memory<wchar_t>, std::char_traits<wchar_t>>;
+using remote_u16string = basic_string<char16_t, remote_memory<char16_t>, std::char_traits<char16_t>>;
+using remote_u32string = basic_string<char32_t, remote_memory<char32_t>, std::char_traits<char32_t>>;
 
 #if __cpp_char8_t
 using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
 template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
 template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-using _u8string_view = basic_string<char8_t, memory_view<char8_t>, std::char_traits<char8_t>>;
+using remote_u8string = basic_string<char8_t, remote_memory<char8_t>, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t
 
 } // namespace ist
 
 
 namespace std {
-
-template<class T, class M, class Traits>
-inline void swap(ist::basic_string<T, M, Traits>& l, ist::basic_string<T, M, Traits>& r) noexcept
-{
-    l.swap(r);
-}
 
 template<class T, class M, class Traits>
 inline int stoi(ist::basic_string<T, M, Traits>& v, size_t* pos = nullptr, int base = 10) { return v.template to_number<int>(pos, base); }

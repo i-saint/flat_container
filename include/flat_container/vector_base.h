@@ -5,12 +5,6 @@
 namespace ist {
 
 
-// std::construct_at() requires c++20 so define our own.
-template<class T, class... Args>
-inline constexpr T* _construct_at(T* p, Args&&... args)
-{
-    return new (p) T(std::forward<Args>(args)...);
-}
 // std::destroy, std::destroy_at is c++17 but define our own for consistency with construct_at.
 template<class T>
 inline constexpr void _destroy_at(T* p)
@@ -38,55 +32,16 @@ public:
     using const_iterator = const_pointer;
 
 
-    vector_base() {}
-    vector_base(const vector_base& r) { operator=(r); }
-    vector_base(vector_base&& r) noexcept { operator=(std::move(r)); }
-    template<bool view = is_memory_view_v<super>, fc_require(view)>
+    vector_base() = default;
+    constexpr vector_base(const vector_base& r) = default;
+    constexpr vector_base(vector_base&& r) noexcept = default;
+    constexpr vector_base& operator=(const vector_base& r) = default;
+    constexpr vector_base& operator=(vector_base&& r) noexcept = default;
+
+    template<bool mapped = is_remote_memory_v<super>, fc_require(mapped)>
     constexpr vector_base(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
-    }
-    ~vector_base()
-    {
-        _shrink(this->_size());
-    }
-
-    // operator=()
-    vector_base& operator=(const vector_base& r)
-    {
-        this->_copy_on_write();
-        _assign(r.size(), [&](pointer dst) { _copy_range(dst, r.begin(), r.end()); });
-        return *this;
-    }
-    vector_base& operator=(vector_base&& r)
-    {
-        swap(r);
-        return *this;
-    }
-
-    // swap()
-    constexpr void swap(vector_base& r)
-    {
-        if constexpr (have_buffer_v<super>) {
-            if constexpr (is_reallocatable_v<super>) {
-                if (this->_capacity() > this->buffer_capacity() && r._capacity() > r.buffer_capacity()) {
-                    std::swap(this->_capacity(), r._capacity());
-                    std::swap(this->_size(), r._size());
-                    std::swap(this->_data(), r._data());
-                }
-                else {
-                    this->_swap_content(r);
-                }
-            }
-            else {
-                this->_swap_content(r);
-            }
-        }
-        else {
-            std::swap(this->_capacity(), r._capacity());
-            std::swap(this->_size(), r._size());
-            std::swap(this->_data(), r._data());
-        }
     }
 
     // reserve()

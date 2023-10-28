@@ -36,18 +36,18 @@ public:
     basic_set(const container_type& v) { operator=(v); }
     basic_set(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool view = is_memory_view_v<container_type>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
+    template <class Iter, bool remote = is_remote_memory_v<container_type>, fc_require(!remote), fc_require(is_iterator_v<Iter, value_type>)>
     basic_set(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool view = is_memory_view_v<container_type>, fc_require(!view)>
+    template <bool remote = is_remote_memory_v<container_type>, fc_require(!remote)>
     basic_set(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool view = is_memory_view_v<container_type>, fc_require(view)>
+    template<bool remote = is_remote_memory_v<container_type>, fc_require(remote)>
     basic_set(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -308,17 +308,6 @@ template <class Key, size_t Capacity, class Compare = std::less<>>
 using sbo_set = basic_set<Key, Compare, sbo_vector<Key, Capacity>>;
 
 template <class Key, class Compare = std::less<>>
-using set_view = basic_set<Key, Compare, vector_view<Key>>;
+using remote_set = basic_set<Key, Compare, remote_vector<Key>>;
 
 } // namespace ist
-
-
-namespace std {
-
-template<class K, class Comp, class Cont>
-inline void swap(ist::basic_set<K, Comp, Cont>& l, ist::basic_set<K, Comp, Cont>& r) noexcept
-{
-    l.swap(r);
-}
-
-} // namespace std
