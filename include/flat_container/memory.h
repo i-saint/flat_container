@@ -28,67 +28,73 @@ constexpr bool is_iterator_v<Iter, T, typename std::enable_if_t<std::is_same_v<s
 
 
 template <class T, class = void>
-constexpr bool is_dynamic_memory_v = false;
+constexpr bool is_reallocatable_v = false;
 template <class T>
-constexpr bool is_dynamic_memory_v<T, std::enable_if_t<T::is_dynamic_memory>> = true;
+constexpr bool is_reallocatable_v<T, std::enable_if_t<T::is_reallocatable>> = true;
 
 template <class T, class = void>
-constexpr bool is_sbo_memory_v = false;
+constexpr bool have_buffer_v = false;
 template <class T>
-constexpr bool is_sbo_memory_v<T, std::enable_if_t<T::is_sbo_memory>> = true;
+constexpr bool have_buffer_v<T, std::enable_if_t<T::have_inner_buffer>> = true;
 
 template <class T, class = void>
-constexpr bool is_fixed_memory_v = false;
+constexpr bool is_memory_view_v = false;
 template <class T>
-constexpr bool is_fixed_memory_v<T, std::enable_if_t<T::is_fixed_memory>> = true;
+constexpr bool is_memory_view_v<T, std::enable_if_t<T::is_memory_view>> = true;
 
-template <class T, class = void>
-constexpr bool is_mapped_memory_v = false;
-template <class T>
-constexpr bool is_mapped_memory_v<T, std::enable_if_t<T::is_mapped_memory>> = true;
+
+template<class T>
+inline void _move_and_destroy(T* first, T* last, T* dst)
+{
+    if constexpr (is_pod_v<T>) {
+        std::memcpy(dst, first, sizeof(T) * std::distance(first, last));
+    }
+    else {
+        std::move(first, last, dst);
+        std::destroy(first, last);
+    }
+}
+
 
 
 // memory models
 
 // typical dynamic memory model
-template<class T>
+template<class T, class Allocator = std::allocator<T>>
 class dynamic_memory
 {
 public:
     using value_type = T;
-    static constexpr bool is_dynamic_memory = true;
+    using allocator_type = Allocator;
+    static constexpr bool is_reallocatable = true;
 
 protected:
-    T* _allocate(size_t size)
-    {
-        if (size == 0) {
-            return nullptr;
-        }
-        return (T*)std::malloc(sizeof(T) * size);
-    }
+    size_t& _capacity() { return capacity_; }
+    size_t _capacity() const { return capacity_; }
+    size_t& _size() { return size_; }
+    size_t _size() const { return size_; }
+    value_type*& _data() { return data_; }
+    value_type* _data() const { return data_; }
+    void _copy_on_write() {}
 
-    void _deallocate(void *addr)
-    {
-        std::free(addr);
-    }
-
-    template<class Move>
-    void _reallocate(size_t new_capaity, Move&& move)
+    void _resize_capacity(size_t new_capaity)
     {
         if (capacity_ == new_capaity) {
             return;
         }
-        T* new_data = _allocate(new_capaity);
-        move(new_data);
 
-        _deallocate(data_);
+        value_type* new_data = allocator_type().allocate(new_capaity);
+        _move_and_destroy(data_, data_ + size_, new_data);
+        allocator_type().deallocate(data_, capacity_);
+
         data_ = new_data;
         capacity_ = new_capaity;
     }
 
+private:
     size_t capacity_ = 0;
     size_t size_ = 0;
-    T* data_ = nullptr;
+    value_type* data_ = nullptr;
 };
 
 // fixed size memory block
@@ -97,74 +103,83 @@ class fixed_memory
 {
 public:
     using value_type = T;
-    static constexpr bool is_fixed_memory = true;
-    static constexpr size_t fixed_capacity = Capacity;
+    static constexpr bool have_inner_buffer = true;
 
-    fixed_memory() {}
-    ~fixed_memory() {}
+    constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
 protected:
-    static constexpr size_t capacity_ = Capacity;
+    size_t _capacity() const { return Capacity; }
+    size_t& _size() { return size_; }
+    size_t _size() const { return size_; }
+    value_type* _data() const { return (value_type*)buffer_; }
+    void _copy_on_write() {}
+
+private:
     size_t size_ = 0;
-    union {
-        T data_[0]; // for debug
-        std::byte buffer_[sizeof(T) * Capacity]; // uninitialized in intention
-    };
+    char buffer_[sizeof(value_type) * Capacity]; // uninitialized in intention
 };
 
 // dynamic memory with small buffer optimization.
 // if required size is smaller than internal buffer, internal buffer is used. otherwise, it allocates dynamic memory.
 // so, it behaves like hybrid of dynamic_memory and fixed_memory.
 // (many of std::string implementations use this strategy)
-template<class T, size_t Capacity>
+template<class T, size_t Capacity, class Allocator = std::allocator<T>>
 class sbo_memory
 {
 public:
     using value_type = T;
-    static constexpr bool is_sbo_memory = true;
-    static constexpr size_t fixed_capacity = Capacity;
+    using allocator_type = Allocator;
+    static constexpr bool is_reallocatable = true;
+    static constexpr bool have_inner_buffer = true;
 
-    constexpr size_t buffer_capacity() noexcept { return fixed_capacity; }
+    constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
 protected:
-    T* _allocate(size_t size)
+    size_t& _capacity() { return capacity_; }
+    size_t _capacity() const { return capacity_; }
+    size_t& _size() { return size_; }
+    size_t _size() const { return size_; }
+    value_type*& _data() { return data_; }
+    value_type* _data() const { return data_; }
+    void _copy_on_write() {}
+
+    value_type* _allocate(size_t size)
     {
-        if (size <= fixed_capacity) {
-            return (T*)buffer_;
+        if (size <= Capacity) {
+            return (value_type*)buffer_;
         }
         else {
-            return (T*)std::malloc(sizeof(T) * size);
+            return allocator_type().allocate(size);
         }
     }
 
     void _deallocate(void* addr)
     {
         if (addr != buffer_) {
-            std::free(addr);
+            allocator_type().deallocate(data_, capacity_);
         }
     }
 
-    template<class Move>
-    void _reallocate(size_t new_capaity, Move&& move)
+    void _resize_capacity(size_t new_capaity)
     {
         if (capacity_ == new_capaity) {
             return;
         }
-        T* new_data = _allocate(new_capaity);
-        if (new_data == data_) {
-            return;
-        }
-        move(new_data);
 
+        value_type* new_data = _allocate(new_capaity);
+        _move_and_destroy(data_, data_ + size_, new_data);
         _deallocate(data_);
+
         data_ = new_data;
         capacity_ = new_capaity;
     }
 
-    size_t capacity_ = fixed_capacity;
+private:
+    size_t capacity_ = Capacity;
     size_t size_ = 0;
-    T* data_ = (T*)buffer_;
-    std::byte buffer_[sizeof(T) * fixed_capacity]; // uninitialized in intention
+    value_type* data_ = (value_type*)buffer_;
+    size_t pad_[1]; // align
+    char buffer_[sizeof(T) * Capacity]; // uninitialized in intention
 };
 
 // "wrap" existing memory block.
@@ -174,22 +189,32 @@ protected:
 // mapped containers destroys elements in destructor.
 // calling detach() waives ownership.
 template<class T>
-class mapped_memory
+class memory_view
 {
 public:
     using value_type = T;
-    static constexpr bool is_mapped_memory = true;
+    static constexpr bool is_memory_view = true;
 
-    constexpr mapped_memory() {}
-    constexpr mapped_memory(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
+    memory_view() = default;
+    memory_view(void* data, size_t capacity, size_t size = 0) : capacity_(capacity), size_(size), data_((T*)data) {}
 
-    constexpr void detach()
+    void detach()
     {
         capacity_ = size_ = 0;
         data_ = nullptr;
     }
 
 protected:
+    size_t& _capacity() { return capacity_; }
+    size_t _capacity() const { return capacity_; }
+    size_t& _size() { return size_; }
+    size_t _size() const { return size_; }
+    T*& _data() { return data_; }
+    T* _data() const { return data_; }
+
+    void _copy_on_write() {}
+
+private:
     size_t capacity_ = 0;
     size_t size_ = 0;
     T* data_ = nullptr;

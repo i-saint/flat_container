@@ -41,19 +41,20 @@ public:
     vector_base() {}
     vector_base(const vector_base& r) { operator=(r); }
     vector_base(vector_base&& r) noexcept { operator=(std::move(r)); }
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(view)>
     constexpr vector_base(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
     }
     ~vector_base()
     {
-        clear();
-        shrink_to_fit();
+        _shrink(this->_size());
     }
 
+    // operator=()
     vector_base& operator=(const vector_base& r)
     {
+        this->_copy_on_write();
         _assign(r.size(), [&](pointer dst) { _copy_range(dst, r.begin(), r.end()); });
         return *this;
     }
@@ -63,97 +64,185 @@ public:
         return *this;
     }
 
+    // swap()
     constexpr void swap(vector_base& r)
     {
-        if constexpr (is_dynamic_memory_v<super> || is_mapped_memory_v<super>) {
-            std::swap(this->capacity_, r.capacity_);
-            std::swap(this->size_, r.size_);
-            std::swap(this->data_, r.data_);
-        }
-        else if constexpr (is_sbo_memory_v<super>) {
-            if (this->capacity_ > this->buffer_capacity_ && r.capacity_ > r.buffer_capacity_) {
-                std::swap(this->capacity_, r.capacity_);
-                std::swap(this->size_, r.size_);
-                std::swap(this->data_, r.data_);
+        if constexpr (have_buffer_v<super>) {
+            if constexpr (is_reallocatable_v<super>) {
+                if (this->_capacity() > this->buffer_capacity() && r._capacity() > r.buffer_capacity()) {
+                    std::swap(this->_capacity(), r._capacity());
+                    std::swap(this->_size(), r._size());
+                    std::swap(this->_data(), r._data());
+                }
+                else {
+                    this->_swap_content(r);
+                }
             }
             else {
                 this->_swap_content(r);
             }
         }
-        else if constexpr (super::is_fixed_memory) {
-            this->_swap_content(r);
+        else {
+            std::swap(this->_capacity(), r._capacity());
+            std::swap(this->_size(), r._size());
+            std::swap(this->_data(), r._data());
         }
     }
 
+    // reserve()
     void reserve(size_t n)
     {
-        if constexpr (is_dynamic_memory_v<super> || is_sbo_memory_v<super>) {
-            if (n <= this->capacity_) {
-                return;
+        if constexpr (is_reallocatable_v<super>) {
+            if (n > this->_capacity()) {
+                this->_copy_on_write();
+                size_t new_capaity = std::max<size_t>(n, this->_capacity() * 2);
+                this->_resize_capacity(new_capaity);
             }
-            size_t new_capaity = std::max<size_t>(n, this->capacity_ * 2);
-            _resize_capacity(new_capaity);
         }
     }
 
+    // shrink_to_fit()
     void shrink_to_fit()
     {
-        if constexpr (is_dynamic_memory_v<super> || is_mapped_memory_v<super>) {
-            _resize_capacity(this->size_);
+        if constexpr (is_reallocatable_v<super>) {
+            if (this->_size() != this->_capacity()) {
+                this->_copy_on_write();
+                this->_resize_capacity(this->_size());
+            }
         }
     }
 
+    // clear()
     constexpr void clear()
     {
-        _shrink(this->size_);
+        if (this->_size() > 0) {
+            this->_copy_on_write();
+            _shrink(this->_size());
+        }
     }
 
-    constexpr size_t capacity() const noexcept { return this->capacity_; }
-    constexpr size_t size() const noexcept { return this->size_; }
-    constexpr size_t size_bytes() const noexcept { return sizeof(value_type) * this->size_; }
-    constexpr pointer data() noexcept { return this->data_; }
-    constexpr const_pointer data() const noexcept { return this->data_; }
+    // capacity() / size() / size_bytes() / empty()
+    constexpr size_t capacity() const noexcept
+    {
+        return this->_capacity();
+    }
+    constexpr size_t size() const noexcept
+    {
+        return this->_size();
+    }
+    constexpr size_t size_bytes() const noexcept
+    {
+        return sizeof(value_type) * this->_size();
+    }
+    constexpr bool empty() const noexcept
+    {
+        return this->_size() == 0;
+    }
 
-    constexpr bool empty() const noexcept { return this->size_ == 0; }
-    constexpr iterator begin() noexcept { return this->data_; }
-    constexpr const_iterator begin() const noexcept { return this->data_; }
-    constexpr const_iterator cbegin() const noexcept { return this->data_; }
-    constexpr iterator end() noexcept { return this->data_ + this->size_; }
-    constexpr const_iterator end() const noexcept { return this->data_ + this->size_; }
-    constexpr const_iterator cend() const noexcept { return this->data_ + this->size_; }
-    constexpr reference at(size_t i) { _boundary_check(i); return this->data_[i]; }
-    constexpr const_reference at(size_t i) const { _boundary_check(i); return this->data_[i]; }
-    constexpr reference operator[](size_t i) { _boundary_check(i); return this->data_[i]; }
-    constexpr const_reference operator[](size_t i) const { _boundary_check(i); return this->data_[i]; }
-    constexpr reference front() { _boundary_check(1); return this->data_[0]; }
-    constexpr const_reference front() const { _boundary_check(1); return this->data_[0]; }
-    constexpr reference back() { _boundary_check(1); return this->data_[this->size_ - 1]; }
-    constexpr const_reference back() const { _boundary_check(1); return this->data_[this->size_ - 1]; }
+    // data() / cdata()
+    constexpr pointer data() noexcept
+    {
+        this->_copy_on_write();
+        return this->_data();
+    }
+    constexpr const_pointer data() const noexcept
+    {
+        return this->_data();
+    }
+    constexpr const_pointer cdata() const noexcept
+    {
+        return this->_data();
+ }
 
+    // begin() / cbegin()
+    constexpr iterator begin() noexcept
+    {
+        this->_copy_on_write();
+        return this->_data();
+    }
+    constexpr const_iterator begin() const noexcept
+    {
+        return this->_data();
+    }
+    constexpr const_iterator cbegin() const noexcept
+    {
+        return this->_data();
+    }
+
+    // end() / cend()
+    constexpr iterator end() noexcept
+    {
+        this->_copy_on_write();
+        return this->_data() + this->_size();
+    }
+    constexpr const_iterator end() const noexcept
+    {
+        return this->_data() + this->_size();
+    }
+    constexpr const_iterator cend() const noexcept
+    {
+        return this->_data() + this->_size();
+    }
+
+    // at()
+    constexpr reference at(size_t i)
+    {
+        _boundary_check(i);
+        this->_copy_on_write();
+        return this->_data()[i];
+    }
+    constexpr const_reference at(size_t i) const
+    {
+        _boundary_check(i);
+        return this->_data()[i];
+    }
+
+    // operator[]
+    constexpr reference operator[](size_t i)
+    {
+        _boundary_check(i);
+        this->_copy_on_write();
+        return this->_data()[i];
+    }
+    constexpr const_reference operator[](size_t i) const
+    {
+        _boundary_check(i);
+        return this->_data()[i];
+    }
+
+    // front()
+    constexpr reference front()
+    {
+        _boundary_check(1);
+        this->_copy_on_write();
+        return this->_data()[0];
+    }
+    constexpr const_reference front() const
+    {
+        _boundary_check(1);
+        return this->_data()[0];
+    }
+
+    // back()
+    constexpr reference back()
+    {
+        _boundary_check(1);
+        this->_copy_on_write();
+        return this->_data()[this->_size() - 1] ;
+    }
+    constexpr const_reference back() const
+    {
+        _boundary_check(1);
+        return this->_data()[this->_size() - 1];
+    }
+
+    // span<value_type>
     constexpr operator span<value_type>() const noexcept
     {
-        return { data(), size() };
+        return { this->_data(), this->_size() };
     }
 
 protected:
-    void _resize_capacity(size_t new_capaity)
-    {
-        if constexpr (is_dynamic_memory_v<super> || is_sbo_memory_v<super>) {
-            this->_reallocate(new_capaity, [&](pointer new_data) {
-                size_t size_move = this->size_; // new_capacity is always >= this->size_
-                if constexpr (is_pod_v<value_type>) {
-                    std::memcpy(new_data, this->data_, sizeof(value_type) * size_move);
-                }
-                else {
-                    for (size_t i = 0; i < size_move; ++i) {
-                        _construct_at<value_type>(new_data + i, std::move(this->data_[i]));
-                        _destroy_at(&this->data_[i]);
-                    }
-                }
-                });
-        }
-    }
-
     template<class Iter, class MaybeOverlapped = std::false_type, fc_require(is_iterator_v<Iter, value_type>)>
     constexpr void _copy_range(iterator dst, Iter first, Iter last, MaybeOverlapped = {})
     {
@@ -167,7 +256,7 @@ protected:
         }
         else {
             size_t n = std::distance(first, last);
-            auto end_assign = std::min(dst + n, this->data_ + this->size_);
+            auto end_assign = std::min(dst + n, this->_data() + this->_size());
             auto end_new = dst + n;
             while (dst < end_assign) {
                 *dst++ = *first++;
@@ -186,7 +275,7 @@ protected:
             }
         }
         else {
-            auto end_assign = std::min(dst + n, this->data_ + this->size_);
+            auto end_assign = std::min(dst + n, this->_data() + this->_size());
             auto end_new = dst + n;
             while (dst < end_assign) {
                 *dst++ = v;
@@ -204,7 +293,7 @@ protected:
         }
         else {
             size_t n = std::distance(first, last);
-            auto end_assign = std::min(dst + n, this->data_ + this->size_);
+            auto end_assign = std::min(dst + n, this->_data() + this->_size());
             auto end_new = dst + n;
             while (dst < end_assign) {
                 *dst++ = std::move(*first++);
@@ -220,7 +309,7 @@ protected:
             *dst = v;
         }
         else {
-            if (dst >= this->data_ + this->size_) {
+            if (dst >= this->_data() + this->_size()) {
                 _construct_at<value_type>(dst, std::move(v));
             }
             else {
@@ -235,7 +324,7 @@ protected:
             *dst = value_type(std::forward<Args>(args)...);
         }
         else {
-            if (dst >= this->data_ + this->size_) {
+            if (dst >= this->_data() + this->_size()) {
                 _construct_at<value_type>(dst, std::forward<Args>(args)...);
             }
             else {
@@ -246,37 +335,37 @@ protected:
 
     constexpr void _swap_content(vector_base& r)
     {
-        size_t max_size = std::max(this->size_, r.size_);
+        size_t max_size = std::max(this->_size(), r._size());
         this->reserve(max_size);
         r.reserve(max_size);
 
         if constexpr (is_pod_v<value_type>) {
             size_t swap_count = max_size;
             for (size_t i = 0; i < swap_count; ++i) {
-                std::swap(this->data_[i], r[i]);
+                std::swap(this->_data()[i], r[i]);
             }
-            std::swap(this->size_, r.size_);
+            std::swap(this->_size(), r._size());
         }
         else {
-            size_t size1 = this->size_;
-            size_t size2 = r.size_;
+            size_t size1 = this->_size();
+            size_t size2 = r._size();
             size_t swap_count = std::min(size1, size2);
             for (size_t i = 0; i < swap_count; ++i) {
-                std::swap(this->data_[i], r[i]);
+                std::swap(this->_data()[i], r[i]);
             }
             if (size1 < size2) {
                 for (size_t i = size1; i < size2; ++i) {
-                    _construct_at<value_type>(this->data_ + i, std::move(r[i]));
+                    _construct_at<value_type>(this->_data() + i, std::move(r[i]));
                     _destroy_at(&r[i]);
                 }
             }
             if (size2 < size1) {
                 for (size_t i = size2; i < size1; ++i) {
-                    _construct_at<value_type>(r.data_ + i, std::move(this->data_[i]));
-                    _destroy_at(&this->data_[i]);
+                    _construct_at<value_type>(r._data() + i, std::move(this->_data()[i]));
+                    _destroy_at(&this->_data()[i]);
                 }
             }
-            std::swap(this->size_, r.size_);
+            std::swap(this->_size(), r._size());
         }
     }
 
@@ -285,43 +374,43 @@ protected:
     {
         this->reserve(n);
         _capacity_check(n);
-        construct(this->data_);
+        construct(this->_data());
         if constexpr (!is_pod_v<value_type>) {
-            if (n < this->size_) {
-                _destroy(this->data_ + n, this->data_ + this->size_);
+            if (n < this->_size()) {
+                _destroy(this->_data() + n, this->_data() + this->_size());
             }
         }
-        this->size_ = n;
+        this->_size() = n;
     }
 
     constexpr void _shrink(size_t n)
     {
-        size_t new_size = this->size_ - n;
+        size_t new_size = this->_size() - n;
         _capacity_check(new_size);
         if constexpr (!is_pod_v<value_type>) {
-            _destroy(this->data_ + new_size, this->data_ + this->size_);
+            _destroy(this->_data() + new_size, this->_data() + this->_size());
         }
-        this->size_ = new_size;
+        this->_size() = new_size;
     }
 
     template<class Construct>
     constexpr void _expand(size_t n, Construct&& construct)
     {
-        size_t new_size = this->size_ + n;
+        size_t new_size = this->_size() + n;
         this->reserve(new_size);
         _capacity_check(new_size);
-        construct(this->data_ + this->size_);
-        this->size_ = new_size;
+        construct(this->_data() + this->_size());
+        this->_size() = new_size;
     }
 
     template<class Construct>
     constexpr void _resize(size_t n, Construct&& construct)
     {
-        if (n < this->size_) {
-            _shrink(this->size_ - n);
+        if (n < this->_size()) {
+            _shrink(this->_size() - n);
         }
-        else if (n > this->size_) {
-            size_t exn = n - this->size_;
+        else if (n > this->_size()) {
+            size_t exn = n - this->_size();
             _expand(exn, [&](pointer addr) {
                 for (size_t i = 0; i < exn; ++i) {
                     construct(addr + i);
@@ -333,12 +422,12 @@ protected:
     template<class Construct>
     constexpr iterator _insert(iterator pos, size_t s, Construct&& construct)
     {
-        size_t d = std::distance(this->data_, pos);
-        this->reserve(this->size_ + s);
-        pos = this->data_ + d; // for the case realloc happened
-        _move_backward(pos, this->data_ + this->size_, this->data_ + this->size_ + s);
+        size_t d = std::distance(this->_data(), pos);
+        this->reserve(this->_size() + s);
+        pos = this->_data() + d; // for the case realloc happened
+        _move_backward(pos, this->_data() + this->_size(), this->_data() + this->_size() + s);
         construct(pos);
-        this->size_ += s;
+        this->_size() += s;
         return pos;
     }
 
@@ -355,7 +444,7 @@ protected:
             }
         }
         else {
-            auto end_new = this->data_ + this->size_;
+            auto end_new = this->_data() + this->_size();
             auto end_assign = dst - n;
             while (dst > end_new) {
                 _construct_at<value_type>(--dst, std::move(*(--last)));
@@ -370,7 +459,7 @@ protected:
     constexpr void _capacity_check(size_t n) const
     {
 #ifdef FC_ENABLE_CAPACITY_CHECK
-        if (n > this->capacity_) {
+        if (n > this->_capacity()) {
             throw std::out_of_range("out of capacity");
         }
 #endif
@@ -379,7 +468,7 @@ protected:
     constexpr void _boundary_check(size_t n) const
     {
 #ifdef FC_ENABLE_CAPACITY_CHECK
-        if (n > this->size_) {
+        if (n > this->_size()) {
             throw std::out_of_range("out of range");
         }
 #endif

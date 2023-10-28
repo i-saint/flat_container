@@ -36,18 +36,18 @@ public:
     basic_set(const container_type& v) { operator=(v); }
     basic_set(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    template <class Iter, bool view = is_memory_view_v<container_type>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
     basic_set(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped)>
+    template <bool view = is_memory_view_v<container_type>, fc_require(!view)>
     basic_set(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool mapped = is_mapped_memory_v<container_type>, fc_require(mapped)>
+    template<bool view = is_memory_view_v<container_type>, fc_require(view)>
     basic_set(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -308,7 +308,7 @@ template <class Key, size_t Capacity, class Compare = std::less<>>
 using sbo_set = basic_set<Key, Compare, sbo_vector<Key, Capacity>>;
 
 template <class Key, class Compare = std::less<>>
-using mapped_set = basic_set<Key, Compare, mapped_vector<Key>>;
+using set_view = basic_set<Key, Compare, vector_view<Key>>;
 
 } // namespace ist
 

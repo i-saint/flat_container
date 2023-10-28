@@ -44,24 +44,24 @@ public:
     basic_string(const basic_string& r) { operator=(r); }
     basic_string(basic_string&& r) noexcept { operator=(std::move(r)); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_string(const_pointer v) { assign(v); }
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_string(const_pointer v, size_t n) { assign(v, n); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_string(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
-    template<class String, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_string_like_v<String, value_type>)>
+    template<class String, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_string_like_v<String, value_type>)>
     constexpr basic_string(const String& str) { assign(str); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(view)>
     constexpr basic_string(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
         , basic_string()
@@ -956,16 +956,16 @@ template<size_t Capacity> using sbo_wstring = basic_string<wchar_t, sbo_memory<w
 template<size_t Capacity> using sbo_u16string = basic_string<char16_t, sbo_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
 template<size_t Capacity> using sbo_u32string = basic_string<char32_t, sbo_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
 
-using mapped_string_view = basic_string<char, mapped_memory<char>, std::char_traits<char>>;
-using mapped_wstring_view = basic_string<wchar_t, mapped_memory<wchar_t>, std::char_traits<wchar_t>>;
-using mapped_u16string_view = basic_string<char16_t, mapped_memory<char16_t>, std::char_traits<char16_t>>;
-using mapped_u32string_view = basic_string<char32_t, mapped_memory<char32_t>, std::char_traits<char32_t>>;
+using string_view = basic_string<char, memory_view<char>, std::char_traits<char>>;
+using wstring_view = basic_string<wchar_t, memory_view<wchar_t>, std::char_traits<wchar_t>>;
+using u16string_view = basic_string<char16_t, memory_view<char16_t>, std::char_traits<char16_t>>;
+using u32string_view = basic_string<char32_t, memory_view<char32_t>, std::char_traits<char32_t>>;
 
 #if __cpp_char8_t
 using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
 template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
 template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-using mapped_u8string = basic_string<char8_t, mapped_memory<char8_t>, std::char_traits<char8_t>>;
+using _u8string_view = basic_string<char8_t, memory_view<char8_t>, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t
 
 } // namespace ist

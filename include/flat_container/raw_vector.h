@@ -25,19 +25,19 @@ public:
     constexpr basic_raw_vector& operator=(const basic_raw_vector& r) = default;
     constexpr basic_raw_vector& operator=(basic_raw_vector&& r) noexcept = default;
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr explicit basic_raw_vector(size_t n) { resize(n); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_raw_vector(size_t n, const_reference v) { resize(n, v); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(!mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(!view)>
     constexpr basic_raw_vector(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool mapped = is_mapped_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, bool view = is_memory_view_v<super>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
     constexpr basic_raw_vector(Iter first, Iter last) { assign(first, last); }
 
-    template<bool mapped = is_mapped_memory_v<super>, fc_require(mapped)>
+    template<bool view = is_memory_view_v<super>, fc_require(view)>
     constexpr basic_raw_vector(void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
@@ -189,7 +189,7 @@ template<class T, size_t Capacity>
 using sbo_raw_vector = basic_raw_vector<T, sbo_memory<T, Capacity>>;
 
 template<class T>
-using mapped_raw_vector = basic_raw_vector<T, mapped_memory<T>>;
+using raw_vector_view = basic_raw_vector<T, memory_view<T>>;
 
 } // namespace ist
 

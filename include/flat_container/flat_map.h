@@ -37,18 +37,18 @@ public:
     basic_map(const container_type& v) { operator=(v); }
     basic_map(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    template <class Iter, bool view = is_memory_view_v<container_type>, fc_require(!view), fc_require(is_iterator_v<Iter, value_type>)>
     basic_map(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool mapped = is_mapped_memory_v<container_type>, fc_require(!mapped)>
+    template <bool view = is_memory_view_v<container_type>, fc_require(!view)>
     basic_map(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool mapped = is_mapped_memory_v<container_type>, fc_require(mapped)>
+    template<bool view = is_memory_view_v<container_type>, fc_require(view)>
     basic_map(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -361,7 +361,7 @@ template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
 using sbo_map = basic_map<Key, Value, Compare, sbo_vector<std::pair<Key, Value>, Capacity>>;
 
 template <class Key, class Value, class Compare = std::less<>>
-using mapped_map = basic_map<Key, Value, Compare, mapped_vector<std::pair<Key, Value>>>;
+using map_view = basic_map<Key, Value, Compare, vector_view<std::pair<Key, Value>>>;
 
 } // namespace ist
 
