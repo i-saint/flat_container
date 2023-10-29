@@ -45,15 +45,18 @@ public:
     constexpr span& operator=(span&& v) = default;
 
 
-    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, T>)>
     constexpr span(Iter first, size_t size) : data_(const_cast<T*>(&*first)) {}
-    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
-    constexpr explicit span(Iter first, Iter last) : data_(const_cast<T*>(&*first)) {}
+
+    template<class Iter, fc_require(is_iterator_of_v<Iter, T>)>
+    constexpr span(Iter first, Iter last) : data_(const_cast<T*>(&*first)) {}
 
     template<size_t N>
     constexpr span(const T(&v)[N]) : data_(const_cast<T*>(v)) {}
+
     template<class U, size_t N>
     constexpr span(const std::array<U, N>& v) : data_(const_cast<T*>(v.data())) {}
+
     template<class Container, fc_require(is_sequential_container_v<Container, T>)>
     constexpr explicit span(const Container& v) : data_(const_cast<T*>(v.data())) {}
 
@@ -127,9 +130,9 @@ public:
     constexpr span& operator=(const span& v) = default;
     constexpr span& operator=(span&& v) = default;
 
-    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, T>)>
     constexpr span(Iter first, size_t size) : data_(const_cast<T*>(&*first)), size_(size) {}
-    template<class Iter, fc_require(is_iterator_v<Iter, T>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, T>)>
     constexpr explicit span(Iter first, Iter last) : data_(const_cast<T*>(&*first)), size_(std::distance(first, last)) {}
 
     template<size_t N>

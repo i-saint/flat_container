@@ -212,10 +212,29 @@ testCase(test_flat_map)
 
 testCase(test_fixed_vector)
 {
-    printf("is_mapped_memory_v<ist::fixed_vector<int, 8>>: %d\n",
-        (int)ist::is_remote_memory_v<ist::fixed_vector<int, 8>>);
-    printf("is_mapped_memory_v<ist::mapped_vector<int>>: %d\n",
-        (int)ist::is_remote_memory_v<ist::remote_vector<int>>);
+    static_assert( ist::has_resize_capacity_v<ist::vector<int>>);
+    static_assert(!ist::has_resize_capacity_v<ist::fixed_vector<int, 8>>);
+    static_assert( ist::has_resize_capacity_v<ist::sbo_vector<int, 8>>);
+    static_assert(!ist::has_resize_capacity_v<ist::remote_vector<int>>);
+    static_assert( ist::has_resize_capacity_v<ist::shared_vector<int>>);
+
+    static_assert(!ist::has_inner_buffer_v<ist::vector<int>>);
+    static_assert( ist::has_inner_buffer_v<ist::fixed_vector<int, 8>>);
+    static_assert( ist::has_inner_buffer_v<ist::sbo_vector<int, 8>>);
+    static_assert(!ist::has_inner_buffer_v<ist::remote_vector<int>>);
+    static_assert(!ist::has_inner_buffer_v<ist::shared_vector<int>>);
+
+    static_assert(!ist::has_remote_memory_v<ist::vector<int>>);
+    static_assert(!ist::has_remote_memory_v<ist::fixed_vector<int, 8>>);
+    static_assert(!ist::has_remote_memory_v<ist::sbo_vector<int, 8>>);
+    static_assert( ist::has_remote_memory_v<ist::remote_vector<int>>);
+    static_assert( ist::has_remote_memory_v<ist::shared_vector<int>>);
+
+    static_assert(!ist::has_copy_on_write_v<ist::vector<int>>);
+    static_assert(!ist::has_copy_on_write_v<ist::fixed_vector<int, 8>>);
+    static_assert(!ist::has_copy_on_write_v<ist::sbo_vector<int, 8>>);
+    static_assert(!ist::has_copy_on_write_v<ist::remote_vector<int>>);
+    static_assert( ist::has_copy_on_write_v<ist::shared_vector<int>>);
 
     {
         // basic tests

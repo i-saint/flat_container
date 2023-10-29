@@ -25,20 +25,20 @@ public:
     constexpr basic_raw_vector& operator=(const basic_raw_vector& r) = default;
     constexpr basic_raw_vector& operator=(basic_raw_vector&& r) noexcept = default;
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr explicit basic_raw_vector(size_t n) { resize(n); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_raw_vector(size_t n, const_reference v) { resize(n, v); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_raw_vector(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool remote = is_remote_memory_v<super>, fc_require(!remote), fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
     constexpr basic_raw_vector(Iter first, Iter last) { assign(first, last); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(remote)>
-    constexpr basic_raw_vector(void* data, size_t capacity, size_t size = 0)
+    template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
+    constexpr basic_raw_vector(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
     }
@@ -87,7 +87,7 @@ public:
         _shrink(1);
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -102,7 +102,7 @@ public:
         _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
     }
 
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);

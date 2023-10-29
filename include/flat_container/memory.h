@@ -24,15 +24,15 @@ template<typename T>
 constexpr bool is_pod_v = std::is_trivial_v<T>;
 
 template<class Iter, class T, class = void>
-constexpr bool is_iterator_v = false;
+constexpr bool is_iterator_of_v = false;
 template<class Iter, class T>
-constexpr bool is_iterator_v<Iter, T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<typename std::iterator_traits<Iter>::value_type>, T>> > = true;
+constexpr bool is_iterator_of_v<Iter, T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<typename std::iterator_traits<Iter>::value_type>, T>> > = true;
 
 
 template <class T, class = void>
-constexpr bool is_reallocatable_v = false;
+constexpr bool has_resize_capacity_v = false;
 template <class T>
-constexpr bool is_reallocatable_v<T, std::enable_if_t<T::is_reallocatable>> = true;
+constexpr bool has_resize_capacity_v<T, std::enable_if_t<T::has_resize_capacity>> = true;
 
 template <class T, class = void>
 constexpr bool has_inner_buffer_v = false;
@@ -40,14 +40,15 @@ template <class T>
 constexpr bool has_inner_buffer_v<T, std::enable_if_t<T::has_inner_buffer>> = true;
 
 template <class T, class = void>
-constexpr bool is_remote_memory_v = false;
+constexpr bool has_remote_memory_v = false;
 template <class T>
-constexpr bool is_remote_memory_v<T, std::enable_if_t<T::is_remote_memory>> = true;
+constexpr bool has_remote_memory_v<T, std::enable_if_t<T::has_remote_memory>> = true;
 
 template <class T, class = void>
 constexpr bool has_copy_on_write_v = false;
 template <class T>
-constexpr bool has_copy_on_write_v<T, std::enable_if_t<T::is_copy_on_write>> = true;
+constexpr bool has_copy_on_write_v<T, std::enable_if_t<T::has_copy_on_write>> = true;
+
 
 // std::construct_at() requires c++20 so define our own.
 template<class T, class... Args>
@@ -95,6 +96,7 @@ constexpr void _move_construct(T* first, T* last, T* dst, size_t existing = 0)
         }
     }
 }
+
 template<class T>
 inline void _swap_content(T* data1, size_t size1, T* data2, size_t size2)
 {
@@ -134,7 +136,7 @@ class dynamic_memory
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    static constexpr bool is_reallocatable = true;
+    static constexpr bool has_resize_capacity = true;
 
     dynamic_memory() = default;
     dynamic_memory(const dynamic_memory& r) { operator=(r); }
@@ -178,7 +180,6 @@ protected:
     size_t _size() const { return size_; }
     value_type*& _data() { return data_; }
     value_type* _data() const { return data_; }
-    void _copy_on_write() {}
 
     value_type* _allocate(size_t size)
     {
@@ -219,9 +220,8 @@ class fixed_memory
 public:
     using value_type = T;
     static constexpr bool has_inner_buffer = true;
-    constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
-    fixed_memory() {}
+    fixed_memory() = default;
     fixed_memory(const fixed_memory& r) { operator=(r); }
     fixed_memory(fixed_memory&& r) noexcept { operator=(std::move(r)); }
 
@@ -250,17 +250,18 @@ public:
         std::swap(size_, r.size_);
     }
 
+    constexpr size_t buffer_capacity() noexcept { return Capacity; }
+
 protected:
     size_t _capacity() const { return capacity_; }
     size_t& _size() { return size_; }
     size_t _size() const { return size_; }
     value_type* _data() const { return data_; }
-    void _copy_on_write() {}
 
 private:
     static constexpr size_t capacity_ = Capacity;
     size_t size_ = 0;
-    value_type* data_ = (value_type*)buffer_; // for debug and align
+    value_type* data_ = reinterpret_cast<value_type*>(buffer_); // for debug and align
     char buffer_[sizeof(value_type) * Capacity]; // uninitialized in intention
 };
 
@@ -274,10 +275,8 @@ class sbo_memory
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    static constexpr bool is_reallocatable = true;
+    static constexpr bool has_resize_capacity = true;
     static constexpr bool has_inner_buffer = true;
-
-    constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
     sbo_memory() = default;
     sbo_memory(const sbo_memory& r) { operator=(r); }
@@ -315,10 +314,19 @@ public:
             std::swap(data_, r.data_);
         }
         else {
-            this->_swap_content(r);
+            size_t max_size = std::max(size_, r.size_);
+            if (capacity_ < max_size) {
+                _resize_capacity(max_size);
+            }
+            if (r.capacity_ < max_size) {
+                r._resize_capacity(max_size);
+            }
+            _swap_content(data_, size_, r.data_, r.size_);
+            std::swap(size_, r.size_);
         }
     }
 
+    constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
 protected:
     size_t& _capacity() { return capacity_; }
@@ -327,7 +335,6 @@ protected:
     size_t _size() const { return size_; }
     value_type*& _data() { return data_; }
     value_type* _data() const { return data_; }
-    void _copy_on_write() {}
 
     value_type* _allocate(size_t size)
     {
@@ -366,7 +373,7 @@ protected:
 private:
     size_t capacity_ = Capacity;
     size_t size_ = 0;
-    value_type* data_ = (value_type*)buffer_;
+    value_type* data_ = reinterpret_cast<value_type*>(buffer_);
     size_t pad_[1]; // align
     char buffer_[sizeof(T) * Capacity]; // uninitialized in intention
 };
@@ -382,14 +389,14 @@ class remote_memory
 {
 public:
     using value_type = T;
-    static constexpr bool is_remote_memory = true;
+    static constexpr bool has_remote_memory = true;
 
     remote_memory() = default;
     remote_memory(const remote_memory& r) { operator=(r); }
     remote_memory(remote_memory&& r) noexcept { operator=(std::move(r)); }
 
-    remote_memory(void* data, size_t capacity, size_t size = 0)
-        : capacity_(capacity), size_(size), data_((T*)data) {}
+    remote_memory(const void* data, size_t capacity, size_t size = 0)
+        : capacity_(capacity), size_(size), data_((value_type*)data) {}
 
     ~remote_memory()
     {
@@ -431,15 +438,13 @@ protected:
     size_t _capacity() const { return capacity_; }
     size_t& _size() { return size_; }
     size_t _size() const { return size_; }
-    T*& _data() { return data_; }
-    T* _data() const { return data_; }
-
-    void _copy_on_write() {}
+    value_type*& _data() { return data_; }
+    value_type* _data() const { return data_; }
 
 private:
     size_t capacity_ = 0;
     size_t size_ = 0;
-    T* data_ = nullptr;
+    value_type* data_ = nullptr;
 };
 
 
@@ -449,35 +454,27 @@ class copy_on_write_memory
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    static constexpr bool is_reallocatable = true;
-    static constexpr bool is_remote_memory = true;
-    static constexpr bool has_copy_on_write = true;
-
     using release_handler = std::function<void(value_type* data, size_t size, size_t capacity)>;
 
-    struct control_block
-    {
-        std::atomic<size_t> ref_count_{ 1 };
-        release_handler on_release_;
-        size_t capacity_ = 0;
-        size_t size_ = 0;
-        value_type* data_ = nullptr;
-    };
+    static constexpr bool has_resize_capacity = true;
+    static constexpr bool has_remote_memory = true;
+    static constexpr bool has_copy_on_write = true;
 
 
     copy_on_write_memory()
     {
         control_ = new control_block();
-        control_->on_release_ = &_default_on_release;
+        control_->on_release_ = &_on_release_default;
     }
     copy_on_write_memory(const copy_on_write_memory& r) { operator=(r); }
     copy_on_write_memory(copy_on_write_memory&& r) noexcept { operator=(std::move(r)); }
 
-    copy_on_write_memory(void* data, size_t capacity, size_t size = 0, release_handler&& on_release = {})
+    copy_on_write_memory(const void* data, size_t capacity, size_t size = 0, release_handler&& on_release = {})
         : copy_on_write_memory()
     {
         control_ = new control_block();
-        control_->data_ = data;
+        control_->data_ = (value_type*)data;
+        control_->flags_.is_foreign_ = 1;
         control_->capacity_ = capacity;
         control_->size_ = size;
         control_->on_release_ = on_release;
@@ -507,12 +504,31 @@ public:
         std::swap(control_, r.control_);
     }
 
+    // true if data is external source
+    // (constructed by copy_on_write_memory(const void* data, size_t capacity, ...) )
+    bool is_foreign_memory() const
+    {
+        return control_->flags_.is_foreign_;
+    }
+
     size_t ref_count() const
     {
         return control_->ref_count_;
     }
 
 protected:
+    struct control_block
+    {
+        std::atomic<uint32_t> ref_count_{ 1 };
+        struct {
+            uint32_t is_foreign_ : 1;
+        } flags_{};
+        release_handler on_release_;
+        size_t capacity_ = 0;
+        size_t size_ = 0;
+        value_type* data_ = nullptr;
+    };
+
     size_t& _capacity() { return control_->capacity_; }
     size_t _capacity() const { return control_->capacity_; }
     size_t& _size() { return control_->size_; }
@@ -520,23 +536,10 @@ protected:
     T*& _data() { return control_->data_; }
     T* _data() const { return control_->data_; }
 
-    static void _default_on_release(value_type* data, size_t size, size_t capacity)
+    static void _on_release_default(value_type* data, size_t size, size_t capacity)
     {
         std::destroy(data, data + size);
         allocator_type().deallocate(data, capacity);
-    }
-
-    void _copy_on_write()
-    {
-        if (control_->ref_count_ > 1) {
-            auto old = control_;
-            auto control_ = new control_block();
-            control_->on_release_ = &_default_on_release;
-            if (old->data_) {
-                _resize_capacity(old->size_);
-                _copy_construct(old->data_, old->data_ + old->size_, control_->data_);
-            }
-        }
     }
 
     void _decref()
@@ -552,6 +555,19 @@ protected:
 
             delete control_;
             control_ = nullptr;
+        }
+    }
+
+    void _copy_on_write()
+    {
+        if (control_->ref_count_ > 1) {
+            auto old = control_;
+            auto control_ = new control_block();
+            control_->on_release_ = &_on_release_default;
+            if (old->data_) {
+                _resize_capacity(old->size_);
+                _copy_construct(old->data_, old->data_ + old->size_, control_->data_);
+            }
         }
     }
 

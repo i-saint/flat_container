@@ -44,29 +44,31 @@ public:
     basic_string(const basic_string& r) { operator=(r); }
     basic_string(basic_string&& r) noexcept { operator=(std::move(r)); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_string(const_pointer v) { assign(v); }
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_string(const_pointer v, size_t n) { assign(v, n); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(!remote)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_string(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool remote = is_remote_memory_v<super>, fc_require(!remote), fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
-    template<class String, bool remote = is_remote_memory_v<super>, fc_require(!remote), fc_require(is_string_like_v<String, value_type>)>
+    template<class String, bool cond = !has_remote_memory_v<super> && is_string_like_v<String, value_type>, fc_require(cond)>
     constexpr basic_string(const String& str) { assign(str); }
 
-    template<bool remote = is_remote_memory_v<super>, fc_require(remote)>
-    constexpr basic_string(void* data, size_t capacity, size_t size = 0)
+    template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
+    constexpr basic_string(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
         , basic_string()
     {
     }
+
     constexpr basic_string& operator=(const basic_string& r)
     {
         return assign(r);
@@ -155,7 +157,7 @@ public:
         _null_terminate();
         return *this;
     }
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr basic_string& assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -200,7 +202,7 @@ public:
         _null_terminate();
         return r;
     }
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -267,7 +269,7 @@ public:
     {
         return append(&ch, 1);
     }
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr basic_string& append(Iter first, Iter last)
     {
         size_t count = std::distance(first, last);
@@ -326,7 +328,7 @@ public:
 
     // replace
 
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
     {
         size_t count = std::distance(first2, last2);

@@ -22,20 +22,20 @@ public:
     constexpr basic_vector& operator=(const basic_vector& r) = default;
     constexpr basic_vector& operator=(basic_vector&& r) noexcept = default;
 
-    template<bool mapped = is_remote_memory_v<super>, fc_require(!mapped)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr explicit basic_vector(size_t n) { resize(n); }
 
-    template<bool mapped = is_remote_memory_v<super>, fc_require(!mapped)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_vector(size_t n, const_reference v) { resize(n, v); }
 
-    template<bool mapped = is_remote_memory_v<super>, fc_require(!mapped)>
+    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_vector(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool mapped = is_remote_memory_v<super>, fc_require(!mapped), fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
     constexpr basic_vector(Iter first, Iter last) { assign(first, last); }
 
-    template<bool mapped = is_remote_memory_v<super>, fc_require(mapped)>
-    constexpr basic_vector(void* data, size_t capacity, size_t size = 0)
+    template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
+    constexpr basic_vector(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
     }
@@ -99,7 +99,7 @@ public:
     }
 
     // assign()
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
         this->_copy_on_write();
@@ -118,7 +118,7 @@ public:
     }
 
     // insert()
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         this->_copy_on_write();

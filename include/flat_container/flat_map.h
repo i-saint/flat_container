@@ -37,18 +37,18 @@ public:
     basic_map(const container_type& v) { operator=(v); }
     basic_map(container_type&& v) noexcept { operator=(std::move(v)); }
 
-    template <class Iter, bool remote = is_remote_memory_v<container_type>, fc_require(!remote), fc_require(is_iterator_v<Iter, value_type>)>
+    template <class Iter, bool cond = !has_remote_memory_v<container_type> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
     basic_map(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool remote = is_remote_memory_v<container_type>, fc_require(!remote)>
+    template <bool cond = !has_remote_memory_v<container_type>, fc_require(cond)>
     basic_map(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool remote = is_remote_memory_v<container_type>, fc_require(remote)>
+    template<bool cond = has_remote_memory_v<container_type>, fc_require(cond)>
     basic_map(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -220,7 +220,7 @@ public:
             return { it, false };
         }
     }
-    template<class Iter, fc_require(is_iterator_v<Iter, value_type>)>
+    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     void insert(Iter first, Iter last)
     {
         for (auto i = first; i != last; ++i) {
