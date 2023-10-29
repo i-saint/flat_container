@@ -37,7 +37,7 @@ testCase(test_flat_set)
     std::set<string> sset;
     ist::flat_set<string> fset;
     ist::fixed_set<string, 32> xset;
-    ist::sbo_set<string, 8> bset;
+    ist::small_set<string, 8> bset;
 
     std::byte buf[sizeof(string) * 32];
     ist::remote_set<string> vset(buf, 32);
@@ -116,7 +116,7 @@ testCase(test_flat_map)
     std::map<string, int> stdmap;
     ist::flat_map<string, int> fmap;
     ist::fixed_map<string, int, 32> xmap;
-    ist::sbo_map<string, int, 8> bmap;
+    ist::small_map<string, int, 8> bmap;
 
     std::byte buf[sizeof(std::pair<string, int>) * 32];
     ist::remote_map<string, int> rmap(buf, 32);
@@ -214,32 +214,32 @@ testCase(test_fixed_vector)
 {
     static_assert( ist::has_resize_capacity_v<ist::vector<int>>);
     static_assert(!ist::has_resize_capacity_v<ist::fixed_vector<int, 8>>);
-    static_assert( ist::has_resize_capacity_v<ist::sbo_vector<int, 8>>);
+    static_assert( ist::has_resize_capacity_v<ist::small_vector<int, 8>>);
     static_assert(!ist::has_resize_capacity_v<ist::remote_vector<int>>);
     static_assert( ist::has_resize_capacity_v<ist::shared_vector<int>>);
 
     static_assert(!ist::has_inner_buffer_v<ist::vector<int>>);
     static_assert( ist::has_inner_buffer_v<ist::fixed_vector<int, 8>>);
-    static_assert( ist::has_inner_buffer_v<ist::sbo_vector<int, 8>>);
+    static_assert( ist::has_inner_buffer_v<ist::small_vector<int, 8>>);
     static_assert(!ist::has_inner_buffer_v<ist::remote_vector<int>>);
     static_assert(!ist::has_inner_buffer_v<ist::shared_vector<int>>);
 
     static_assert(!ist::has_remote_memory_v<ist::vector<int>>);
     static_assert(!ist::has_remote_memory_v<ist::fixed_vector<int, 8>>);
-    static_assert(!ist::has_remote_memory_v<ist::sbo_vector<int, 8>>);
+    static_assert(!ist::has_remote_memory_v<ist::small_vector<int, 8>>);
     static_assert( ist::has_remote_memory_v<ist::remote_vector<int>>);
     static_assert( ist::has_remote_memory_v<ist::shared_vector<int>>);
 
     static_assert(!ist::has_copy_on_write_v<ist::vector<int>>);
     static_assert(!ist::has_copy_on_write_v<ist::fixed_vector<int, 8>>);
-    static_assert(!ist::has_copy_on_write_v<ist::sbo_vector<int, 8>>);
+    static_assert(!ist::has_copy_on_write_v<ist::small_vector<int, 8>>);
     static_assert(!ist::has_copy_on_write_v<ist::remote_vector<int>>);
     static_assert( ist::has_copy_on_write_v<ist::shared_vector<int>>);
 
     {
         // basic tests
         ist::fixed_vector<string, 128> data, data2, data3;
-        ist::sbo_vector<string, 32> sdata;
+        ist::small_vector<string, 32> sdata;
         ist::vector<string> ddata;
 
         std::byte buf[sizeof(string) * 128];
@@ -382,7 +382,7 @@ testCase(test_fixed_raw_vector)
     {
         // basic tests
         ist::fixed_raw_vector<int, 128> data, data2, data3;
-        ist::sbo_raw_vector<int, 32> sdata;
+        ist::small_raw_vector<int, 32> sdata;
         ist::raw_vector<int> ddata;
 
         std::byte buf1[sizeof(int) * 128];

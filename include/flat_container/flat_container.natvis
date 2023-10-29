@@ -36,7 +36,7 @@
     </Expand>
   </Type>
 
-  <Type Name="ist::sbo_memory&lt;*&gt;">
+  <Type Name="ist::small_memory&lt;*&gt;">
     <DisplayString>{{ size={size_} }}</DisplayString>
     <Expand>
       <Item Name="[size]">size_</Item>
@@ -60,7 +60,7 @@
     </Expand>
   </Type>
 
-  <Type Name="ist::copy_on_write_memory&lt;*&gt;">
+  <Type Name="ist::shared_memory&lt;*&gt;">
     <DisplayString>{{ size={control_->size_} }}</DisplayString>
     <Expand>
       <Item Name="[size]">control_->size_</Item>

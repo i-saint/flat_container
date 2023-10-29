@@ -301,15 +301,18 @@ private:
     static constexpr size_t capacity_ = Capacity;
     size_t size_ = 0;
     value_type* data_ = reinterpret_cast<value_type*>(buffer_); // for debug and align
-    char buffer_[sizeof(value_type) * Capacity]; // uninitialized in intention
+
+    // uninitialized in intention
+#pragma warning(disable:26495)
+    char buffer_[sizeof(value_type) * Capacity];
+#pragma warning(default:26495)
 };
 
 // dynamic memory with small buffer optimization.
-// if required size is smaller than internal buffer, internal buffer is used. otherwise, it allocates dynamic memory.
-// so, it behaves like hybrid of dynamic_memory and fixed_memory.
+// if required size is smaller than internal buffer, internal buffer is used. otherwise, it behaves like dynamic_memory.
 // (many of std::string implementations use this strategy)
 template<class T, size_t Capacity, class Allocator = std::allocator<T>>
-class sbo_memory
+class small_memory
 {
 public:
     using value_type = T;
@@ -317,11 +320,11 @@ public:
     static constexpr bool has_resize_capacity = true;
     static constexpr bool has_inner_buffer = true;
 
-    sbo_memory() = default;
-    sbo_memory(const sbo_memory& r) { operator=(r); }
-    sbo_memory(sbo_memory&& r) noexcept { operator=(std::move(r)); }
+    small_memory() = default;
+    small_memory(const small_memory& r) { operator=(r); }
+    small_memory(small_memory&& r) noexcept { operator=(std::move(r)); }
 
-    ~sbo_memory()
+    ~small_memory()
     {
         _destroy(data_, data_ + size_);
         _deallocate(data_, capacity_);
@@ -331,7 +334,7 @@ public:
         data_ = nullptr;
     }
 
-    sbo_memory& operator=(const sbo_memory& r)
+    small_memory& operator=(const small_memory& r)
     {
         if (r.size_ > capacity_) {
             _resize_capacity(r.size_);
@@ -340,13 +343,13 @@ public:
         return *this;
     }
 
-    sbo_memory& operator=(sbo_memory&& r) noexcept
+    small_memory& operator=(small_memory&& r) noexcept
     {
         swap(r);
         return *this;
     }
 
-    void swap(sbo_memory& r)
+    void swap(small_memory& r)
     {
         if ((char*)data_ != buffer_ && (char*)r.data_ != r.buffer_) {
             std::swap(capacity_, r.capacity_);
@@ -410,8 +413,12 @@ private:
     size_t capacity_ = Capacity;
     size_t size_ = 0;
     value_type* data_ = reinterpret_cast<value_type*>(buffer_);
-    size_t pad_[1]; // align
-    char buffer_[sizeof(T) * Capacity]; // uninitialized in intention
+
+    // uninitialized in intention
+#pragma warning(disable:26495)
+    size_t pad_[1];
+    char buffer_[sizeof(value_type) * Capacity];
+#pragma warning(default:26495)
 };
 
 // "wrap" existing memory block.
@@ -490,8 +497,10 @@ private:
 };
 
 
+// reference counted shared memory.
+// it will make a copy when non-const member function is called (copy-on-write).
 template<class T, class Allocator = std::allocator<T>>
-class copy_on_write_memory
+class shared_memory
 {
 public:
     using value_type = T;
@@ -502,17 +511,16 @@ public:
     static constexpr bool has_remote_memory = true;
     static constexpr bool has_copy_on_write = true;
 
-
-    copy_on_write_memory()
+    shared_memory()
     {
         control_ = new control_block();
         control_->on_release_ = &default_on_release;
     }
-    copy_on_write_memory(const copy_on_write_memory& r) { operator=(r); }
-    copy_on_write_memory(copy_on_write_memory&& r) noexcept { operator=(std::move(r)); }
+    shared_memory(const shared_memory& r) { operator=(r); }
+    shared_memory(shared_memory&& r) noexcept { operator=(std::move(r)); }
 
-    copy_on_write_memory(const void* data, size_t capacity, size_t size = 0, release_handler&& on_release = {})
-        : copy_on_write_memory()
+    shared_memory(const void* data, size_t capacity, size_t size = 0, release_handler&& on_release = {})
+        : shared_memory()
     {
         control_ = new control_block();
         control_->data_ = (value_type*)data;
@@ -522,12 +530,12 @@ public:
         control_->on_release_ = on_release;
     }
 
-    ~copy_on_write_memory()
+    ~shared_memory()
     {
         _decref();
     }
 
-    copy_on_write_memory& operator=(const copy_on_write_memory& r)
+    shared_memory& operator=(const shared_memory& r)
     {
         _decref();
         control_ = r.control_;
@@ -535,27 +543,27 @@ public:
         return *this;
     }
 
-    copy_on_write_memory& operator=(copy_on_write_memory&& r) noexcept
+    shared_memory& operator=(shared_memory&& r) noexcept
     {
         swap(r);
         return *this;
     }
 
-    void swap(copy_on_write_memory& r)
+    void swap(shared_memory& r)
     {
         std::swap(control_, r.control_);
     }
 
-    // true if data is external source
+    uint32_t ref_count() const
+    {
+        return control_->ref_count_;
+    }
+
+    // true if data is external source.
     // (constructed by copy_on_write_memory(const void* data, size_t capacity, ...) )
     bool is_foreign_memory() const
     {
         return control_->flags_.is_foreign_;
-    }
-
-    size_t ref_count() const
-    {
-        return control_->ref_count_;
     }
 
     static void default_on_release(value_type* data, size_t size, size_t capacity)
@@ -580,7 +588,7 @@ protected:
     size_t _capacity() const { return control_->capacity_; }
     size_t& _size() { return control_->size_; }
     size_t _size() const { return control_->size_; }
-    T* _data() const { return control_->data_; }
+    value_type* _data() const { return control_->data_; }
 
     void _decref()
     {

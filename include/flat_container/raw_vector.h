@@ -201,12 +201,12 @@ template<class T, size_t Capacity>
 using fixed_raw_vector = basic_raw_vector<T, fixed_memory<T, Capacity>>;
 
 template<class T, size_t Capacity, class Allocator = std::allocator<T>>
-using sbo_raw_vector = basic_raw_vector<T, sbo_memory<T, Capacity, Allocator>>;
+using small_raw_vector = basic_raw_vector<T, small_memory<T, Capacity, Allocator>>;
 
 template<class T>
 using remote_raw_vector = basic_raw_vector<T, remote_memory<T>>;
 
 template<class T, class Allocator = std::allocator<T>>
-using shared_raw_vector = basic_raw_vector<T, copy_on_write_memory<T, Allocator>>;
+using shared_raw_vector = basic_raw_vector<T, shared_memory<T, Allocator>>;
 
 } // namespace ist

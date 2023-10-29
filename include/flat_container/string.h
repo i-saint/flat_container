@@ -953,27 +953,27 @@ template<size_t Capacity> using fixed_wstring = basic_string<wchar_t, fixed_memo
 template<size_t Capacity> using fixed_u16string = basic_string<char16_t, fixed_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
 template<size_t Capacity> using fixed_u32string = basic_string<char32_t, fixed_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
 
-template<size_t Capacity> using sbo_string = basic_string<char, sbo_memory<char, Capacity>, std::char_traits<char>>;
-template<size_t Capacity> using sbo_wstring = basic_string<wchar_t, sbo_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
-template<size_t Capacity> using sbo_u16string = basic_string<char16_t, sbo_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
-template<size_t Capacity> using sbo_u32string = basic_string<char32_t, sbo_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
+template<size_t Capacity> using small_string = basic_string<char, small_memory<char, Capacity>, std::char_traits<char>>;
+template<size_t Capacity> using small_wstring = basic_string<wchar_t, small_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
+template<size_t Capacity> using small_u16string = basic_string<char16_t, small_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
+template<size_t Capacity> using small_u32string = basic_string<char32_t, small_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
 
 using remote_string = basic_string<char, remote_memory<char>, std::char_traits<char>>;
 using remote_wstring = basic_string<wchar_t, remote_memory<wchar_t>, std::char_traits<wchar_t>>;
 using remote_u16string = basic_string<char16_t, remote_memory<char16_t>, std::char_traits<char16_t>>;
 using remote_u32string = basic_string<char32_t, remote_memory<char32_t>, std::char_traits<char32_t>>;
 
-using shared_string = basic_string<char, copy_on_write_memory<char>, std::char_traits<char>>;
-using shared_wstring = basic_string<wchar_t, copy_on_write_memory<wchar_t>, std::char_traits<wchar_t>>;
-using shared_u16string = basic_string<char16_t, copy_on_write_memory<char16_t>, std::char_traits<char16_t>>;
-using shared_u32string = basic_string<char32_t, copy_on_write_memory<char32_t>, std::char_traits<char32_t>>;
+using shared_string = basic_string<char, shared_memory<char>, std::char_traits<char>>;
+using shared_wstring = basic_string<wchar_t, shared_memory<wchar_t>, std::char_traits<wchar_t>>;
+using shared_u16string = basic_string<char16_t, shared_memory<char16_t>, std::char_traits<char16_t>>;
+using shared_u32string = basic_string<char32_t, shared_memory<char32_t>, std::char_traits<char32_t>>;
 
 #if __cpp_char8_t
 using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
 template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-template<size_t Capacity> using sbo_u8string = basic_string<char8_t, sbo_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
+template<size_t Capacity> using small_u8string = basic_string<char8_t, small_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
 using remote_u8string = basic_string<char8_t, remote_memory<char8_t>, std::char_traits<char8_t>>;
-using shared_u8string = basic_string<char8_t, copy_on_write_memory<char8_t>, std::char_traits<char8_t>>;
+using shared_u8string = basic_string<char8_t, shared_memory<char8_t>, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t
 
 } // namespace ist

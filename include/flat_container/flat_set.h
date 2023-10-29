@@ -306,7 +306,7 @@ template <class Key, size_t Capacity, class Compare = std::less<>>
 using fixed_set = basic_set<Key, Compare, fixed_vector<Key, Capacity>>;
 
 template <class Key, size_t Capacity, class Compare = std::less<>, class Allocator = std::allocator<Key>>
-using sbo_set = basic_set<Key, Compare, sbo_vector<Key, Capacity, Allocator>>;
+using small_set = basic_set<Key, Compare, small_vector<Key, Capacity, Allocator>>;
 
 template <class Key, class Compare = std::less<>>
 using remote_set = basic_set<Key, Compare, remote_vector<Key>>;
