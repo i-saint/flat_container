@@ -4,20 +4,6 @@
 
 namespace ist {
 
-
-// std::destroy, std::destroy_at is c++17 but define our own for consistency with construct_at.
-template<class T>
-inline constexpr void _destroy_at(T* p)
-{
-    std::destroy_at(p);
-}
-template<class Iter>
-inline constexpr void _destroy(const Iter first, const Iter last)
-{
-    std::destroy(first, last);
-}
-
-
 template<class Memory>
 class vector_base : public Memory
 {
@@ -32,13 +18,14 @@ public:
     using const_pointer = const value_type*;
     using iterator = pointer;
     using const_iterator = const_pointer;
+    using memory_type = Memory;
 
 
     vector_base() = default;
-    constexpr vector_base(const vector_base& r) = default;
     constexpr vector_base(vector_base&& r) noexcept = default;
-    constexpr vector_base& operator=(const vector_base& r) = default;
     constexpr vector_base& operator=(vector_base&& r) noexcept = default;
+    constexpr vector_base(const vector_base& r) = default;
+    constexpr vector_base& operator=(const vector_base& r) = default;
 
     template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
     constexpr vector_base(const void* data, size_t capacity, size_t size = 0)

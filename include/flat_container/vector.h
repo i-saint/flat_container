@@ -15,12 +15,13 @@ public:
     using typename super::const_reference;
     using typename super::iterator;
     using typename super::const_iterator;
+    using typename super::memory_type;
 
     constexpr basic_vector() = default;
-    constexpr basic_vector(const basic_vector& r) = default;
     constexpr basic_vector(basic_vector&& r) noexcept = default;
-    constexpr basic_vector& operator=(const basic_vector& r) = default;
     constexpr basic_vector& operator=(basic_vector&& r) noexcept = default;
+    constexpr basic_vector(const basic_vector& r) = default;
+    constexpr basic_vector& operator=(const basic_vector& r) = default;
 
     template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr explicit basic_vector(size_t n) { resize(n); }
@@ -61,24 +62,24 @@ public:
     // resize()
     constexpr void resize(size_t n)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _resize(n, [&](pointer addr) { _construct_at(addr); });
     }
     constexpr void resize(size_t n, const_reference v)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _resize(n, [&](pointer addr) { _construct_at(addr, v); });
     }
 
     // push_back()
     constexpr void push_back(const_reference v)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _expand(1, [&](pointer addr) { _construct_at(addr, v); });
     }
     constexpr void push_back(value_type&& v)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _expand(1, [&](pointer addr) { _construct_at(addr, std::move(v)); });
     }
 
@@ -86,7 +87,7 @@ public:
     template< class... Args >
     constexpr reference emplace_back(Args&&... args)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _expand(1, [&](pointer addr) { _construct_at(addr, std::forward<Args>(args)...); });
         return back();
     }
@@ -94,7 +95,7 @@ public:
     // pop_back()
     constexpr void pop_back()
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _shrink(1);
     }
 
@@ -102,18 +103,18 @@ public:
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         size_t n = std::distance(first, last);
         _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
     }
     constexpr void assign(std::initializer_list<value_type> list)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
     }
     constexpr void assign(size_t n, const_reference v)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
     }
 
@@ -121,23 +122,23 @@ public:
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         size_t n = std::distance(first, last);
         return _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
     }
     constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         return _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
     }
     constexpr iterator insert(iterator pos, const_reference v)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         return _insert(pos, 1, [&](pointer addr) { _copy_n(addr, v, 1); });
     }
     constexpr iterator insert(iterator pos, value_type&& v)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         return _insert(pos, 1, [&](pointer addr) { _move_one(addr, std::move(v)); });
     }
 
@@ -145,14 +146,14 @@ public:
     template< class... Args >
     constexpr iterator emplace(iterator pos, Args&&... args)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         return _insert(pos, 1, [&](pointer addr) { _emplace_one(addr, std::forward<Args>(args)...); });
     }
 
     // erase()
     constexpr iterator erase(iterator first, iterator last)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         size_t s = std::distance(first, last);
         std::move(last, end(), first);
         _shrink(s);
@@ -160,11 +161,13 @@ public:
     }
     constexpr iterator erase(iterator pos)
     {
-        this->_copy_on_write();
+        _copy_on_write();
         return erase(pos, pos + 1);
     }
 
 protected:
+    using super::_copy_on_write;
+
     using super::_copy_range;
     using super::_copy_n;
     using super::_move_range;

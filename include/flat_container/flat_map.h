@@ -32,10 +32,10 @@ public:
     using const_iterator         = typename container_type::const_iterator;
 
     basic_map() {}
-    basic_map(const basic_map& v) { operator=(v); }
     basic_map(basic_map&& v) noexcept { operator=(std::move(v)); }
-    basic_map(const container_type& v) { operator=(v); }
     basic_map(container_type&& v) noexcept { operator=(std::move(v)); }
+    basic_map(const basic_map& v) { operator=(v); }
+    basic_map(const container_type& v) { operator=(v); }
 
     template <class Iter, bool cond = !has_remote_memory_v<container_type> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
     basic_map(Iter first, Iter last)
@@ -59,15 +59,16 @@ public:
         data_ = v.data_;
         return *this;
     }
-    basic_map& operator=(basic_map&& v) noexcept
-    {
-        swap(v);
-        return *this;
-    }
     basic_map& operator=(const container_type& v)
     {
         data_ = v.data_;
         sort();
+        return *this;
+    }
+
+    basic_map& operator=(basic_map&& v) noexcept
+    {
+        swap(v);
         return *this;
     }
     basic_map& operator=(container_type&& v) noexcept

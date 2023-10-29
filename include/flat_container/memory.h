@@ -57,48 +57,90 @@ inline constexpr T* _construct_at(T* p, Args&&... args)
     return new (p) T(std::forward<Args>(args)...);
 }
 
-// existing: count of existing (constructed) objects in dst
 template<class T>
-inline void _copy_construct(T* first, T* last, T* dst, size_t existing = 0)
+inline void _destroy(T* first, T* last)
 {
     if constexpr (is_pod_v<T>) {
-        std::memcpy(dst, first, sizeof(T) * std::distance(first, last));
-    }
-    else {
-        size_t n = std::distance(first, last);
-        auto end_assign = dst + std::min(n, existing);
-        auto end_construct = dst + n;
-        while (dst < end_assign) {
-            *dst++ = *first++;
-        }
-        while (dst < end_construct) {
-            _construct_at<T>(dst++, *first++);
+        if (first < last) {
+            std::destroy(first, last);
         }
     }
 }
-
-// existing: count of existing (constructed) objects in dst
 template<class T>
-constexpr void _move_construct(T* first, T* last, T* dst, size_t existing = 0)
+inline void _destroy_at(T* dst)
 {
     if constexpr (is_pod_v<T>) {
-        std::memcpy(dst, first, sizeof(T) * std::distance(first, last));
-    }
-    else {
-        size_t n = std::distance(first, last);
-        auto end_assign = dst + std::min(n, existing);
-        auto end_construct = dst + n;
-        while (dst < end_assign) {
-            *dst++ = std::move(*first++);
-        }
-        while (dst < end_construct) {
-            _construct_at<T>(dst++, std::move(*first++));
-        }
+        std::destroy_at(dst);
     }
 }
 
+
+// dst_size: count of existing (constructed) objects in dst
 template<class T>
-inline void _swap_content(T* data1, size_t size1, T* data2, size_t size2)
+inline void _copy_content(T* src, size_t src_size, T* dst, size_t dst_capacity, size_t& dst_size)
+{
+    size_t n = std::min(src_size, dst_capacity);
+    if constexpr (is_pod_v<T>) {
+        std::memcpy(dst, src, sizeof(T) * n);
+    }
+    else {
+        auto end_assign = dst + std::min(n, dst_size);
+        auto end_construct = dst + n;
+        auto end_destroy = dst + dst_size;
+        auto ps = src;
+        auto pd = dst;
+        while (pd < end_assign) {
+            *pd++ = *ps++;
+        }
+        while (pd < end_construct) {
+            _construct_at<T>(pd++, *ps++);
+        }
+        _destroy(pd, end_destroy);
+    }
+    dst_size = n;
+}
+template<class T>
+inline void _copy_content(T* src, size_t src_size, T* dst, size_t dst_capacity)
+{
+    size_t dst_size = 0;
+    _copy_content(src, src_size, dst, dst_capacity, dst_size);
+}
+
+// dst_size: count of existing (constructed) objects in dst
+// ** elements of src will be moved and destroyed **
+template<class T>
+inline void _move_content(T* src, size_t src_size, T* dst, size_t dst_capacity, size_t& dst_size)
+{
+    size_t n = std::min(src_size, dst_capacity);
+    if constexpr (is_pod_v<T>) {
+        std::memcpy(dst, src, sizeof(T) * n);
+    }
+    else {
+        auto end_assign = dst + std::min(n, dst_size);
+        auto end_construct = dst + n;
+        auto end_destroy = dst + dst_size;
+        auto ps = src;
+        auto pd = dst;
+        while (pd < end_assign) {
+            *pd++ = std::move(*ps++);
+        }
+        while (pd < end_construct) {
+            _construct_at<T>(pd++, std::move(*ps++));
+        }
+        _destroy(pd, end_destroy);
+        _destroy(src, src + src_size);
+    }
+    dst_size = n;
+}
+template<class T>
+inline void _move_content(T* src, size_t src_size, T* dst, size_t dst_capacity)
+{
+    size_t dst_size = 0;
+    _move_content(src, src_size, dst, dst_capacity, dst_size);
+}
+
+template<class T>
+inline void _swap_content(T* data1, size_t& size1, T* data2, size_t& size2)
 {
     if constexpr (is_pod_v<T>) {
         size_t swap_count = std::max(size1, size2);
@@ -114,16 +156,17 @@ inline void _swap_content(T* data1, size_t size1, T* data2, size_t size2)
         if (size1 < size2) {
             for (size_t i = size1; i < size2; ++i) {
                 _construct_at<T>(&data1[i], std::move(data2[i]));
-                std::destroy_at(&data2[i]);
+                _destroy_at(&data2[i]);
             }
         }
         if (size2 < size1) {
             for (size_t i = size2; i < size1; ++i) {
                 _construct_at<T>(&data2[i], std::move(data1[i]));
-                std::destroy_at(&data1[i]);
+                _destroy_at(&data1[i]);
             }
         }
     }
+    std::swap(size1, size2);
 }
 
 
@@ -144,7 +187,7 @@ public:
 
     ~dynamic_memory()
     {
-        std::destroy(data_, data_ + size_);
+        _destroy(data_, data_ + size_);
         _deallocate(data_, capacity_);
 
         // clear for debug
@@ -154,9 +197,10 @@ public:
 
     dynamic_memory& operator=(const dynamic_memory& r)
     {
-        _resize_capacity(r.size_);
-        _copy_construct(r.data_, r.data_ + r.size_, data_, size_);
-        size_ = r.size_;
+        if (r.size_ > capacity_) {
+            _resize_capacity(r.size_);
+        }
+        _copy_content(r.data_, r.size_, data_, capacity_, size_);
         return *this;
     }
 
@@ -174,11 +218,9 @@ public:
     }
 
 protected:
-    size_t& _capacity() { return capacity_; }
     size_t _capacity() const { return capacity_; }
     size_t& _size() { return size_; }
     size_t _size() const { return size_; }
-    value_type*& _data() { return data_; }
     value_type* _data() const { return data_; }
 
     value_type* _allocate(size_t size)
@@ -198,8 +240,7 @@ protected:
         }
 
         value_type* new_data = _allocate(new_capaity);
-        _move_construct(data_, data_ + std::min(size_, new_capaity), new_data);
-        std::destroy(data_, data_ + size_);
+        _move_content(data_, size_, new_data, new_capaity);
         _deallocate(data_, capacity_);
 
         data_ = new_data;
@@ -227,14 +268,13 @@ public:
 
     ~fixed_memory()
     {
-        std::destroy(data_, data_ + size_);
+        _destroy(data_, data_ + size_);
         size_ = 0;
     }
 
     fixed_memory& operator=(const fixed_memory& r)
     {
-        _copy_construct(r.data_, r.data_ + r.size_, data_, size_);
-        size_ = r.size_;
+        _copy_content(r.data_, r.size_, data_, capacity_, size_);
         return *this;
     }
 
@@ -247,7 +287,6 @@ public:
     void swap(fixed_memory& r)
     {
         _swap_content(data_, size_, r.data_, r.size_);
-        std::swap(size_, r.size_);
     }
 
     constexpr size_t buffer_capacity() noexcept { return Capacity; }
@@ -284,7 +323,7 @@ public:
 
     ~sbo_memory()
     {
-        std::destroy(data_, data_ + size_);
+        _destroy(data_, data_ + size_);
         _deallocate(data_, capacity_);
 
         // clear for debug
@@ -294,9 +333,10 @@ public:
 
     sbo_memory& operator=(const sbo_memory& r)
     {
-        _resize_capacity(r.size_);
-        _copy_construct(r.data_, r.data_ + r.size_, data_, size_);
-        size_ = r.size_;
+        if (r.size_ > capacity_) {
+            _resize_capacity(r.size_);
+        }
+        _copy_content(r.data_, r.size_, data_, capacity_, size_);
         return *this;
     }
 
@@ -322,18 +362,15 @@ public:
                 r._resize_capacity(max_size);
             }
             _swap_content(data_, size_, r.data_, r.size_);
-            std::swap(size_, r.size_);
         }
     }
 
     constexpr size_t buffer_capacity() noexcept { return Capacity; }
 
 protected:
-    size_t& _capacity() { return capacity_; }
     size_t _capacity() const { return capacity_; }
     size_t& _size() { return size_; }
     size_t _size() const { return size_; }
-    value_type*& _data() { return data_; }
     value_type* _data() const { return data_; }
 
     value_type* _allocate(size_t size)
@@ -361,8 +398,7 @@ protected:
         }
 
         value_type* new_data = _allocate(new_capaity);
-        _move_construct(data_, data_ + std::min(size_, new_capaity), new_data);
-        std::destroy(data_, data_ + size_);
+        _move_content(data_, size_, new_data, new_capaity);
         _deallocate(data_, capacity_);
 
         data_ = new_data;
@@ -389,28 +425,30 @@ class remote_memory
 {
 public:
     using value_type = T;
+    using release_handler = std::function<void(value_type* data, size_t size, size_t capacity)>;
     static constexpr bool has_remote_memory = true;
 
+
     remote_memory() = default;
-    remote_memory(const remote_memory& r) { operator=(r); }
     remote_memory(remote_memory&& r) noexcept { operator=(std::move(r)); }
 
-    remote_memory(const void* data, size_t capacity, size_t size = 0)
-        : capacity_(capacity), size_(size), data_((value_type*)data) {}
+    // movable but non-copyable
+    remote_memory(const remote_memory& r) = delete;
+    remote_memory& operator=(const remote_memory& r) = delete;
+
+    remote_memory(const void* data, size_t capacity, size_t size = 0, release_handler&& on_release = default_on_release)
+        : capacity_(capacity), size_(size), data_((value_type*)data), on_release_(on_release)
+    {}
 
     ~remote_memory()
     {
-        std::destroy(data_, data_ + size_);
+        if (on_release_) {
+            on_release_(data_, size_, capacity_);
+        }
+
+        // clear for debug
         capacity_ = size_ = 0;
         data_ = nullptr;
-    }
-
-    remote_memory& operator=(const remote_memory& r)
-    {
-        _copy_construct(r.data_, r.data_ + r.size_, data_, size_);
-        capacity_ = r.capacity_;
-        size_ = r.size_;
-        return *this;
     }
 
     remote_memory& operator=(remote_memory&& r) noexcept
@@ -433,18 +471,22 @@ public:
         data_ = nullptr;
     }
 
+    static void default_on_release(value_type* data, size_t size, size_t /*capacity*/)
+    {
+        _destroy(data, data + size);
+    }
+
 protected:
-    size_t& _capacity() { return capacity_; }
     size_t _capacity() const { return capacity_; }
     size_t& _size() { return size_; }
     size_t _size() const { return size_; }
-    value_type*& _data() { return data_; }
     value_type* _data() const { return data_; }
 
 private:
     size_t capacity_ = 0;
     size_t size_ = 0;
     value_type* data_ = nullptr;
+    release_handler on_release_;
 };
 
 
@@ -464,7 +506,7 @@ public:
     copy_on_write_memory()
     {
         control_ = new control_block();
-        control_->on_release_ = &_on_release_default;
+        control_->on_release_ = &default_on_release;
     }
     copy_on_write_memory(const copy_on_write_memory& r) { operator=(r); }
     copy_on_write_memory(copy_on_write_memory&& r) noexcept { operator=(std::move(r)); }
@@ -516,6 +558,12 @@ public:
         return control_->ref_count_;
     }
 
+    static void default_on_release(value_type* data, size_t size, size_t capacity)
+    {
+        _destroy(data, data + size);
+        allocator_type().deallocate(data, capacity);
+    }
+
 protected:
     struct control_block
     {
@@ -529,18 +577,10 @@ protected:
         value_type* data_ = nullptr;
     };
 
-    size_t& _capacity() { return control_->capacity_; }
     size_t _capacity() const { return control_->capacity_; }
     size_t& _size() { return control_->size_; }
     size_t _size() const { return control_->size_; }
-    T*& _data() { return control_->data_; }
     T* _data() const { return control_->data_; }
-
-    static void _on_release_default(value_type* data, size_t size, size_t capacity)
-    {
-        std::destroy(data, data + size);
-        allocator_type().deallocate(data, capacity);
-    }
 
     void _decref()
     {
@@ -563,10 +603,10 @@ protected:
         if (control_->ref_count_ > 1) {
             auto old = control_;
             auto control_ = new control_block();
-            control_->on_release_ = &_on_release_default;
+            control_->on_release_ = &default_on_release;
             if (old->data_) {
                 _resize_capacity(old->size_);
-                _copy_construct(old->data_, old->data_ + old->size_, control_->data_);
+                _copy_content(old->data_, old->size_, control_->data_, control_->capacity_, control_->size_);
             }
         }
     }
@@ -583,18 +623,20 @@ protected:
 
     void _resize_capacity(size_t new_capaity)
     {
-        if (_capacity() == new_capaity) {
+        auto& data_ = control_->data_;
+        auto& capacity = control_->capacity_;
+        auto& size_ = control_->size_;
+        if (capacity == new_capaity) {
             return;
         }
 
         value_type* new_data = _allocate(new_capaity);
-        _move_construct(_data(), _data() + std::min(_size(), new_capaity), new_data);
-        std::destroy(_data(), _data() + _size());
-        _deallocate(_data(), _capacity());
+        _move_content(data_, size_, new_data, new_capaity);
+        _deallocate(data_, capacity);
 
-        _data() = new_data;
-        _capacity() = new_capaity;
-        _size() = std::min(_size(), new_capaity);
+        data_ = new_data;
+        capacity = new_capaity;
+        size_ = std::min(size_, new_capaity);
     }
 
 private:

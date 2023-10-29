@@ -41,8 +41,8 @@ public:
             _null_terminate();
         }
     }
-    basic_string(const basic_string& r) { operator=(r); }
     basic_string(basic_string&& r) noexcept { operator=(std::move(r)); }
+    basic_string(const basic_string& r) { operator=(r); }
 
     template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }

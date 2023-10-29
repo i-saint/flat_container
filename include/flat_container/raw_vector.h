@@ -20,10 +20,10 @@ public:
     using typename super::const_iterator;
 
     constexpr basic_raw_vector() = default;
-    constexpr basic_raw_vector(const basic_raw_vector& r) = default;
     constexpr basic_raw_vector(basic_raw_vector&& r) noexcept = default;
-    constexpr basic_raw_vector& operator=(const basic_raw_vector& r) = default;
     constexpr basic_raw_vector& operator=(basic_raw_vector&& r) noexcept = default;
+    constexpr basic_raw_vector(const basic_raw_vector& r) = default;
+    constexpr basic_raw_vector& operator=(const basic_raw_vector& r) = default;
 
     template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
     constexpr explicit basic_raw_vector(size_t n) { resize(n); }
@@ -63,77 +63,92 @@ public:
 
     constexpr void resize(size_t n)
     {
+        _copy_on_write();
         _resize(n, [&](pointer) {}); // new elements are uninitialized
     }
     constexpr void resize(size_t n, const_reference v)
     {
+        _copy_on_write();
         _resize(n, [&](pointer addr) { *addr = v; });
     }
 
     constexpr void push_back(const_reference v)
     {
+        _copy_on_write();
         _expand(1, [&](pointer addr) { *addr = v; });
     }
 
     template< class... Args >
     constexpr reference emplace_back(Args&&... args)
     {
+        _copy_on_write();
         _expand(1, [&](pointer addr) { *addr = value_type(std::forward<Args>(args)...); });
         return back();
     }
 
     constexpr void pop_back()
     {
+        _copy_on_write();
         _shrink(1);
     }
 
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
+        _copy_on_write();
         size_t n = std::distance(first, last);
         _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
     }
     constexpr void assign(std::initializer_list<value_type> list)
     {
+        _copy_on_write();
         _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
     }
     constexpr void assign(size_t n, const_reference v)
     {
+        _copy_on_write();
         _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
     }
 
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
+        _copy_on_write();
         size_t n = std::distance(first, last);
         return _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
     }
     constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
+        _copy_on_write();
         return _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
     }
     constexpr iterator insert(iterator pos, const_reference v)
     {
+        _copy_on_write();
         return _insert(pos, 1, [&](pointer addr) { _copy_n(addr, v, 1); });
     }
     template< class... Args >
     constexpr iterator emplace(iterator pos, Args&&... args)
     {
+        _copy_on_write();
         return _insert(pos, 1, [&](pointer addr) { _emplace_one(addr, std::forward<Args>(args)...); });
     }
 
     constexpr iterator erase(iterator first, iterator last)
     {
+        _copy_on_write();
         _copy_range(first, last, end(), std::true_type{});
         _shrink(std::distance(first, last));
         return first;
     }
     constexpr iterator erase(iterator pos)
     {
+        _copy_on_write();
         return erase(pos, pos + 1);
     }
 
 protected:
+    using super::_copy_on_write;
     using super::_copy_range;
     using super::_copy_n;
     using super::_move_range;

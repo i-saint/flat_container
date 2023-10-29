@@ -32,8 +32,8 @@ public:
 
     basic_set() {}
     basic_set(const basic_set& v) { operator=(v); }
-    basic_set(basic_set&& v) noexcept { operator=(std::move(v)); }
     basic_set(const container_type& v) { operator=(v); }
+    basic_set(basic_set&& v) noexcept { operator=(std::move(v)); }
     basic_set(container_type&& v) noexcept { operator=(std::move(v)); }
 
     template <class Iter, bool cond = !has_remote_memory_v<container_type> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
@@ -58,15 +58,16 @@ public:
         data_ = v.data_;
         return *this;
     }
-    basic_set& operator=(basic_set&& v) noexcept
-    {
-        swap(v);
-        return *this;
-    }
     basic_set& operator=(const container_type& v)
     {
         data_ = v.data_;
         sort();
+        return *this;
+    }
+
+    basic_set& operator=(basic_set&& v) noexcept
+    {
+        swap(v);
         return *this;
     }
     basic_set& operator=(container_type&& v) noexcept

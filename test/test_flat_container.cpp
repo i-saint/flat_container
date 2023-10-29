@@ -30,7 +30,7 @@
 
 
 using test::Timer;
-using string = ist::string;
+using string = std::string;
 
 testCase(test_flat_set)
 {
