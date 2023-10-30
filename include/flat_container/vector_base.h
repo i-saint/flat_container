@@ -65,19 +65,22 @@ public:
         }
     }
 
-    // capacity() / size() / size_bytes() / empty()
+    // capacity()
     constexpr size_t capacity() const noexcept
     {
         return _capacity();
     }
+    // size()
     constexpr size_t size() const noexcept
     {
         return _size();
     }
+    // size_bytes()
     constexpr size_t size_bytes() const noexcept
     {
         return sizeof(value_type) * _size();
     }
+    // empty()
     constexpr bool empty() const noexcept
     {
         return _size() == 0;
@@ -212,16 +215,16 @@ protected:
         else {
             size_t n = std::distance(first, last);
             auto end_assign = std::min(dst + n, _data() + _size());
-            auto end_new = dst + n;
+            auto end_construct = dst + n;
             while (dst < end_assign) {
                 *dst++ = *first++;
             }
-            while (dst < end_new) {
+            while (dst < end_construct) {
                 _construct_at<value_type>(dst++, *first++);
             }
         }
     }
-    constexpr void _copy_n(iterator dst, const_reference v, size_t n)
+    constexpr void _fill_range(iterator dst, const_reference v, size_t n)
     {
         if constexpr (is_pod_v<value_type>) {
             auto end_assign = dst + n;
@@ -231,11 +234,11 @@ protected:
         }
         else {
             auto end_assign = std::min(dst + n, _data() + _size());
-            auto end_new = dst + n;
+            auto end_construct = dst + n;
             while (dst < end_assign) {
                 *dst++ = v;
             }
-            while (dst < end_new) {
+            while (dst < end_construct) {
                 _construct_at<value_type>(dst++, v);
             }
         }
@@ -249,11 +252,11 @@ protected:
         else {
             size_t n = std::distance(first, last);
             auto end_assign = std::min(dst + n, _data() + _size());
-            auto end_new = dst + n;
+            auto end_construct = dst + n;
             while (dst < end_assign) {
                 *dst++ = std::move(*first++);
             }
-            while (dst < end_new) {
+            while (dst < end_construct) {
                 _construct_at<value_type>(dst++, std::move(*first++));
             }
         }
@@ -294,11 +297,7 @@ protected:
         this->reserve(n);
         _capacity_check(n);
         construct(_data());
-        if constexpr (!is_pod_v<value_type>) {
-            if (n < _size()) {
-                _destroy(_data() + n, _data() + _size());
-            }
-        }
+        _destroy(_data() + n, _data() + _size());
         _size() = n;
     }
 
@@ -306,9 +305,7 @@ protected:
     {
         size_t new_size = _size() - n;
         _capacity_check(new_size);
-        if constexpr (!is_pod_v<value_type>) {
-            _destroy(_data() + new_size, _data() + _size());
-        }
+        _destroy(_data() + new_size, _data() + _size());
         _size() = new_size;
     }
 
@@ -363,9 +360,9 @@ protected:
             }
         }
         else {
-            auto end_new = _data() + _size();
+            auto end_construct = _data() + _size();
             auto end_assign = dst - n;
-            while (dst > end_new) {
+            while (dst > end_construct) {
                 _construct_at<value_type>(--dst, std::move(*(--last)));
             }
             while (dst > end_assign) {

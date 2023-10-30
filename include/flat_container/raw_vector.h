@@ -61,6 +61,10 @@ public:
     using super::front;
     using super::back;
 
+    // as_const()
+    constexpr const basic_raw_vector& as_const() const { return *this; }
+
+    // resize()
     constexpr void resize(size_t n)
     {
         _copy_on_write();
@@ -72,12 +76,14 @@ public:
         _resize(n, [&](pointer addr) { *addr = v; });
     }
 
+    // push_back()
     constexpr void push_back(const_reference v)
     {
         _copy_on_write();
         _expand(1, [&](pointer addr) { *addr = v; });
     }
 
+    // emplace_back()
     template< class... Args >
     constexpr reference emplace_back(Args&&... args)
     {
@@ -86,12 +92,14 @@ public:
         return back();
     }
 
+    // pop_back()
     constexpr void pop_back()
     {
         _copy_on_write();
         _shrink(1);
     }
 
+    // assign()
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr void assign(Iter first, Iter last)
     {
@@ -107,9 +115,10 @@ public:
     constexpr void assign(size_t n, const_reference v)
     {
         _copy_on_write();
-        _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
+        _assign(n, [&](pointer dst) { _fill_range(dst, v, n); });
     }
 
+    // insert()
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
@@ -125,8 +134,10 @@ public:
     constexpr iterator insert(iterator pos, const_reference v)
     {
         _copy_on_write();
-        return _insert(pos, 1, [&](pointer addr) { _copy_n(addr, v, 1); });
+        return _insert(pos, 1, [&](pointer addr) { _fill_range(addr, v, 1); });
     }
+
+    // emplace()
     template< class... Args >
     constexpr iterator emplace(iterator pos, Args&&... args)
     {
@@ -134,6 +145,7 @@ public:
         return _insert(pos, 1, [&](pointer addr) { _emplace_one(addr, std::forward<Args>(args)...); });
     }
 
+    // erase()
     constexpr iterator erase(iterator first, iterator last)
     {
         _copy_on_write();
@@ -150,7 +162,7 @@ public:
 protected:
     using super::_copy_on_write;
     using super::_copy_range;
-    using super::_copy_n;
+    using super::_fill_range;
     using super::_move_range;
     using super::_move_one;
     using super::_emplace_one;

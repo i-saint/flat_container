@@ -59,6 +59,10 @@ public:
     using super::front;
     using super::back;
 
+    // as_const()
+    // mainly for remote_vector and shared_vector
+    constexpr const basic_vector& as_const() const { return *this; }
+
     // resize()
     constexpr void resize(size_t n)
     {
@@ -115,7 +119,7 @@ public:
     constexpr void assign(size_t n, const_reference v)
     {
         _copy_on_write();
-        _assign(n, [&](pointer dst) { _copy_n(dst, v, n); });
+        _assign(n, [&](pointer dst) { _fill_range(dst, v, n); });
     }
 
     // insert()
@@ -134,7 +138,7 @@ public:
     constexpr iterator insert(iterator pos, const_reference v)
     {
         _copy_on_write();
-        return _insert(pos, 1, [&](pointer addr) { _copy_n(addr, v, 1); });
+        return _insert(pos, 1, [&](pointer addr) { _fill_range(addr, v, 1); });
     }
     constexpr iterator insert(iterator pos, value_type&& v)
     {
@@ -169,7 +173,7 @@ protected:
     using super::_copy_on_write;
 
     using super::_copy_range;
-    using super::_copy_n;
+    using super::_fill_range;
     using super::_move_range;
     using super::_move_one;
     using super::_emplace_one;

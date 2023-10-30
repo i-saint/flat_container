@@ -62,7 +62,7 @@ public:
     basic_map& operator=(const container_type& v)
     {
         data_ = v.data_;
-        sort();
+        _sort();
         return *this;
     }
 
@@ -84,7 +84,7 @@ public:
     void swap(container_type& v) noexcept
     {
         data_.swap(v);
-        sort();
+        _sort();
     }
 
     const container_type& get() const { return data_; }
@@ -108,7 +108,10 @@ public:
     const_iterator end() const noexcept { return data_.end(); }
     constexpr const_iterator cend() const noexcept { return data_.cend(); }
 
-    // search
+    // as_const()
+    constexpr const basic_map& as_const() const { return *this; }
+
+    // lower_bound()
     iterator lower_bound(const key_type& v)
     {
         return std::lower_bound(begin(), end(), v, cmp_first<>());
@@ -128,6 +131,7 @@ public:
         return std::lower_bound(begin(), end(), v, cmp_first<C>());
     }
 
+    // upper_bound()
     iterator upper_bound(const key_type& v)
     {
         return std::upper_bound(begin(), end(), v, cmp_first<>());
@@ -147,6 +151,7 @@ public:
         return std::upper_bound(begin(), end(), v, cmp_first<C>());
     }
 
+    // equal_range()
     std::pair<iterator, iterator> equal_range(const key_type& v)
     {
         return std::equal_range(begin(), end(), v, cmp_first<>());
@@ -166,15 +171,16 @@ public:
         return std::equal_range(begin(), end(), v, cmp_first<C>());
     }
 
+    // find()
     iterator find(const key_type& v)
     {
         auto it = lower_bound(v);
-        return (it != end() && equal(it->first, v)) ? it : end();
+        return (it != end() && _equal(it->first, v)) ? it : end();
     }
     const_iterator find(const key_type& v) const
     {
         auto it = lower_bound(v);
-        return (it != end() && equal(it->first, v)) ? it : end();
+        return (it != end() && _equal(it->first, v)) ? it : end();
     }
     template <class V, class C = Compare, class = typename C::is_transparent>
     iterator find(const V& v)
@@ -189,6 +195,7 @@ public:
         return (it != end() && equal<key_type, V, C>(it->first, v)) ? it : end();
     }
 
+    // count()
     size_t count(const key_type& v) const
     {
         return find(v) != end() ? 1 : 0;
@@ -199,12 +206,11 @@ public:
         return find<V, C>(v) != end() ? 1 : 0;
     }
 
-    // insert & erase
-
+    // insert()
     std::pair<iterator, bool> insert(const value_type& v)
     {
         auto it = lower_bound(v.first);
-        if (it == end() || !equal(it->first, v.first)) {
+        if (it == end() || !_equal(it->first, v.first)) {
             return { data_.insert(it, v), true };
         }
         else {
@@ -214,7 +220,7 @@ public:
     std::pair<iterator, bool> insert(value_type&& v)
     {
         auto it = lower_bound(v.first);
-        if (it == end() || !equal(it->first, v.first)) {
+        if (it == end() || !_equal(it->first, v.first)) {
             return { data_.insert(it, std::move(v)), true };
         }
         else {
@@ -233,6 +239,7 @@ public:
         insert(list.begin(), list.end());
     }
 
+    // erase()
     iterator erase(const key_type& v)
     {
         if (auto it = find(v); it != end()) {
@@ -251,6 +258,7 @@ public:
         return data_.erase(first, last);
     }
 
+    // at()
     mapped_type& at(const key_type& v)
     {
         if (auto it = find(v); it != end()) {
@@ -270,6 +278,7 @@ public:
         }
     }
 
+    // operator[]
     mapped_type& operator[](const key_type& v)
     {
         if (auto it = find(v); it != end()) {
@@ -291,7 +300,7 @@ public:
 
 
 private:
-    void sort()
+    void _sort()
     {
         std::sort(begin(), end(), [](auto& a, auto& b) { return key_compare()(a.first, b.first); });
     }
@@ -306,12 +315,12 @@ private:
         }
     };
 
-    static bool equal(const key_type& a, const key_type& b)
+    static bool _equal(const key_type& a, const key_type& b)
     {
         return !Compare()(a, b) && !Compare()(b, a);
     }
     template <class V1, class V2, class C = Compare, class = typename C::is_transparent>
-    static bool equal(const V1& a, const V2& b)
+    static bool _equal(const V1& a, const V2& b)
     {
         return !C()(a, b) && !C()(b, a);
     }

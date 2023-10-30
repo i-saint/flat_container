@@ -101,6 +101,10 @@ public:
     constexpr const_pointer c_str() const { return data(); }
     constexpr size_t length() const { return size(); }
 
+    // as_const()
+    constexpr const basic_string& as_const() const { return *this; }
+
+    // resize()
     constexpr void resize(size_t n)
     {
         _resize(n, [&](pointer) {}); // new elements are uninitialized
@@ -112,6 +116,7 @@ public:
         _null_terminate();
     }
 
+    // resize_and_overwrite()
     template<class Operation>
     constexpr void resize_and_overwrite(size_t n, Operation op = [](pointer, size_t s) { return s; })
     {
@@ -120,12 +125,14 @@ public:
         this->size_ = size;
     }
 
+    // push_back()
     constexpr void push_back(const_reference v)
     {
         _expand(1, [&](pointer addr) { *addr = v; });
         _null_terminate();
     }
 
+    // pop_back()
     constexpr void pop_back()
     {
         _shrink(1);
@@ -133,8 +140,7 @@ public:
     }
 
 
-    // assign
-
+    // assign()
     constexpr basic_string& assign(const_pointer str, size_t n)
     {
         _assign(n, [&](pointer dst) { _copy_range(dst, str, str + n); });
@@ -147,7 +153,7 @@ public:
     }
     constexpr basic_string& assign(size_t n, value_type ch)
     {
-        _assign(n, [&](pointer dst) { _copy_n(dst, ch, n); });
+        _assign(n, [&](pointer dst) { _fill_range(dst, ch, n); });
         _null_terminate();
         return *this;
     }
@@ -180,8 +186,7 @@ public:
     }
 
 
-    // insert
-
+    // insert()
     constexpr iterator insert(iterator pos, const_pointer str, size_t n)
     {
         auto r = _insert(pos, n, [&](pointer addr) { _copy_range(addr, str, str + n); });
@@ -198,7 +203,7 @@ public:
     }
     constexpr iterator insert(iterator pos, size_t n, value_type v)
     {
-        auto r = _insert(pos, n, [&](pointer addr) { _copy_n(addr, v, n); });
+        auto r = _insert(pos, n, [&](pointer addr) { _fill_range(addr, v, n); });
         _null_terminate();
         return r;
     }
@@ -232,7 +237,7 @@ public:
     }
     constexpr basic_string& insert(size_t pos, size_t count, value_type ch)
     {
-        _insert(begin() + pos, count, [&](pointer addr) { _copy_n(addr, ch, count); });
+        _insert(begin() + pos, count, [&](pointer addr) { _fill_range(addr, ch, count); });
         _null_terminate();
         return *this;
     }
@@ -252,7 +257,7 @@ public:
     }
 
 
-    // append
+    // append()
 
     constexpr basic_string& append(const_pointer str, size_t count)
     {
@@ -296,6 +301,7 @@ public:
         return append(first, last);
     }
 
+    // operator+=()
     constexpr basic_string& operator+=(value_type ch) { return append(ch); }
     constexpr basic_string& operator+=(const_pointer str) { return append(str); }
     constexpr basic_string& operator+=(std::initializer_list<value_type> list) { return append(list); }
@@ -303,7 +309,7 @@ public:
     constexpr basic_string& operator+=(const String& str) { return append(str); }
 
 
-    // erase
+    // erase()
 
     constexpr iterator erase(iterator first, iterator last)
     {
@@ -326,7 +332,7 @@ public:
     }
 
 
-    // replace
+    // replace()
 
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
@@ -344,7 +350,7 @@ public:
     }
     constexpr basic_string& replace(iterator first, iterator last, size_t count, value_type ch)
     {
-        return _replace(first, last, count, [&](pointer addr) { _copy_n(addr, ch, count); });
+        return _replace(first, last, count, [&](pointer addr) { _fill_range(addr, ch, count); });
     }
 
     constexpr basic_string& replace(size_t pos, size_t count, const_pointer str, size_t count2)
@@ -380,7 +386,7 @@ public:
     }
 
 
-    // find
+    // find()
 
     constexpr size_t find(const_pointer str, size_t pos, size_t count) const noexcept
     {
@@ -401,7 +407,7 @@ public:
     }
 
 
-    // find_first_of
+    // find_first_of()
 
     constexpr size_t find_first_of(const_pointer str, size_t pos, size_t count) const noexcept
     {
@@ -424,7 +430,7 @@ public:
     }
 
 
-    // find_first_not_of
+    // find_first_not_of()
 
     constexpr size_t find_first_not_of(const_pointer str, size_t pos, size_t count) const noexcept
     {
@@ -447,7 +453,7 @@ public:
     }
 
 
-    // find_last_of
+    // find_last_of()
 
     constexpr size_t find_last_of(const_pointer str, size_t pos, size_t count) const noexcept
     {
@@ -470,7 +476,7 @@ public:
     }
 
 
-    // find_last_not_of
+    // find_last_not_of()
 
     constexpr size_t find_last_not_of(const_pointer str, size_t pos, size_t count) const noexcept
     {
@@ -493,7 +499,7 @@ public:
     }
 
 
-    // starts_with
+    // starts_with()
 
     constexpr bool starts_with(value_type ch) const noexcept
     {
@@ -512,7 +518,7 @@ public:
     }
 
 
-    // ends_with
+    // ends_with()
 
     constexpr bool ends_with(value_type ch) const noexcept
     {
@@ -531,7 +537,7 @@ public:
     }
 
 
-    // compare
+    // compare()
 
     constexpr int compare(size_t pos1, size_t count1, const_pointer str, size_t pos2, size_t count2) const noexcept
     {
@@ -564,7 +570,7 @@ public:
     }
 
 
-    // substr
+    // substr()
 
     constexpr basic_string substr(size_t pos = 0, size_t count = npos) const
     {
@@ -573,7 +579,7 @@ public:
     }
 
 
-    // copy
+    // copy()
 
     constexpr size_t copy(pointer dest, size_t count, size_t pos = 0)
     {
@@ -646,7 +652,7 @@ public:
 
 protected:
     using super::_copy_range;
-    using super::_copy_n;
+    using super::_fill_range;
     using super::_move_range;
     using super::_move_one;
     using super::_emplace_one;

@@ -84,18 +84,15 @@ inline void _copy_content(T* src, size_t src_size, T* dst, size_t dst_capacity, 
         std::memcpy(dst, src, sizeof(T) * n);
     }
     else {
-        auto end_assign = dst + std::min(n, dst_size);
-        auto end_construct = dst + n;
-        auto end_destroy = dst + dst_size;
-        auto ps = src;
-        auto pd = dst;
-        while (pd < end_assign) {
-            *pd++ = *ps++;
-        }
-        while (pd < end_construct) {
-            _construct_at<T>(pd++, *ps++);
-        }
-        _destroy(pd, end_destroy);
+        size_t num_copy = std::min(n, dst_size);
+        size_t num_new = dst_size >= n ? 0 : n - dst_size;
+        size_t pos = 0;
+
+        std::copy_n(src, num_copy, dst);
+        pos += num_copy;
+        std::uninitialized_copy_n(src + pos, num_new, dst + pos);
+        pos += num_new;
+        _destroy(dst + pos, dst + dst_size);
     }
     dst_size = n;
 }
@@ -116,18 +113,15 @@ inline void _move_content(T* src, size_t src_size, T* dst, size_t dst_capacity, 
         std::memcpy(dst, src, sizeof(T) * n);
     }
     else {
-        auto end_assign = dst + std::min(n, dst_size);
-        auto end_construct = dst + n;
-        auto end_destroy = dst + dst_size;
-        auto ps = src;
-        auto pd = dst;
-        while (pd < end_assign) {
-            *pd++ = std::move(*ps++);
-        }
-        while (pd < end_construct) {
-            _construct_at<T>(pd++, std::move(*ps++));
-        }
-        _destroy(pd, end_destroy);
+        size_t num_move = std::min(n, dst_size);
+        size_t num_new = dst_size >= n ? 0 : n - dst_size;
+        size_t pos = 0;
+
+        std::move(src, src + num_move, dst);
+        pos += num_move;
+        std::uninitialized_move_n(src + pos, num_new, dst + pos);
+        pos += num_new;
+        _destroy(dst + pos, dst + dst_size);
         _destroy(src, src + src_size);
     }
     dst_size = n;
@@ -223,16 +217,6 @@ protected:
     size_t _size() const { return size_; }
     value_type* _data() const { return data_; }
 
-    value_type* _allocate(size_t size)
-    {
-        return size == 0 ? nullptr : allocator_type().allocate(size);
-    }
-
-    void _deallocate(value_type* data, size_t size)
-    {
-        allocator_type().deallocate(data, size);
-    }
-
     void _resize_capacity(size_t new_capaity)
     {
         if (capacity_ == new_capaity) {
@@ -249,6 +233,17 @@ protected:
     }
 
 private:
+    value_type* _allocate(size_t size)
+    {
+        return size == 0 ? nullptr : allocator_type().allocate(size);
+    }
+
+    void _deallocate(value_type* data, size_t size)
+    {
+        allocator_type().deallocate(data, size);
+    }
+
+private:
     size_t capacity_ = 0;
     size_t size_ = 0;
     value_type* data_ = nullptr;
@@ -261,6 +256,7 @@ class fixed_memory
 public:
     using value_type = T;
     static constexpr bool has_inner_buffer = true;
+    static_assert(alignof(value_type) <= 16);
 
     fixed_memory() = default;
     fixed_memory(const fixed_memory& r) { operator=(r); }
@@ -303,9 +299,7 @@ private:
     value_type* data_ = reinterpret_cast<value_type*>(buffer_); // for debug and align
 
     // uninitialized in intention
-#pragma warning(disable:26495)
     char buffer_[sizeof(value_type) * Capacity];
-#pragma warning(default:26495)
 };
 
 // dynamic memory with small buffer optimization.
@@ -319,6 +313,7 @@ public:
     using allocator_type = Allocator;
     static constexpr bool has_resize_capacity = true;
     static constexpr bool has_inner_buffer = true;
+    static_assert(alignof(value_type) <= 16);
 
     small_memory() = default;
     small_memory(const small_memory& r) { operator=(r); }
@@ -376,23 +371,6 @@ protected:
     size_t _size() const { return size_; }
     value_type* _data() const { return data_; }
 
-    value_type* _allocate(size_t size)
-    {
-        if (size <= Capacity) {
-            return (value_type*)buffer_;
-        }
-        else {
-            return allocator_type().allocate(size);
-        }
-    }
-
-    void _deallocate(value_type* data, size_t size)
-    {
-        if ((char*)data != buffer_) {
-            allocator_type().deallocate(data, size);
-        }
-    }
-
     void _resize_capacity(size_t new_capaity)
     {
         new_capaity = std::max(new_capaity, Capacity);
@@ -410,15 +388,31 @@ protected:
     }
 
 private:
+    value_type* _allocate(size_t size)
+    {
+        if (size <= Capacity) {
+            return (value_type*)buffer_;
+        }
+        else {
+            return allocator_type().allocate(size);
+        }
+    }
+
+    void _deallocate(value_type* data, size_t size)
+    {
+        if ((char*)data != buffer_) {
+            allocator_type().deallocate(data, size);
+        }
+    }
+
+private:
     size_t capacity_ = Capacity;
     size_t size_ = 0;
     value_type* data_ = reinterpret_cast<value_type*>(buffer_);
 
     // uninitialized in intention
-#pragma warning(disable:26495)
     size_t pad_[1];
     char buffer_[sizeof(value_type) * Capacity];
-#pragma warning(default:26495)
 };
 
 // "wrap" existing memory block.
@@ -443,23 +437,18 @@ public:
     remote_memory(const remote_memory& r) = delete;
     remote_memory& operator=(const remote_memory& r) = delete;
 
-    remote_memory(const void* data, size_t capacity, size_t size = 0, release_handler&& on_release = default_on_release)
+    remote_memory(const void* data, size_t capacity, size_t size = 0, release_handler&& on_release = destroy_elements)
         : capacity_(capacity), size_(size), data_((value_type*)data), on_release_(on_release)
     {}
 
     ~remote_memory()
     {
-        if (on_release_) {
-            on_release_(data_, size_, capacity_);
-        }
-
-        // clear for debug
-        capacity_ = size_ = 0;
-        data_ = nullptr;
+        dispose();
     }
 
     remote_memory& operator=(remote_memory&& r) noexcept
     {
+        dispose();
         swap(r);
         return *this;
     }
@@ -471,14 +460,22 @@ public:
         std::swap(data_, r.data_);
     }
 
-    // detach memory without destroying existing elements
-    void detach()
+
+    bool valid() const
     {
+        return data_ != nullptr;
+    }
+
+    void dispose()
+    {
+        if (on_release_) {
+            on_release_(data_, size_, capacity_);
+        }
         capacity_ = size_ = 0;
         data_ = nullptr;
     }
 
-    static void default_on_release(value_type* data, size_t size, size_t /*capacity*/)
+    static void destroy_elements(value_type* data, size_t size, size_t /*capacity*/)
     {
         _destroy(data, data + size);
     }
@@ -514,7 +511,7 @@ public:
     shared_memory()
     {
         control_ = new control_block();
-        control_->on_release_ = &default_on_release;
+        control_->on_release_ = &_release_owned_memory;
     }
     shared_memory(const shared_memory& r) { operator=(r); }
     shared_memory(shared_memory&& r) noexcept { operator=(std::move(r)); }
@@ -524,7 +521,6 @@ public:
     {
         control_ = new control_block();
         control_->data_ = (value_type*)data;
-        control_->flags_.is_foreign_ = 1;
         control_->capacity_ = capacity;
         control_->size_ = size;
         control_->on_release_ = on_release;
@@ -532,7 +528,7 @@ public:
 
     ~shared_memory()
     {
-        _decref();
+        dispose();
     }
 
     shared_memory& operator=(const shared_memory& r)
@@ -545,6 +541,7 @@ public:
 
     shared_memory& operator=(shared_memory&& r) noexcept
     {
+        dispose();
         swap(r);
         return *this;
     }
@@ -554,79 +551,40 @@ public:
         std::swap(control_, r.control_);
     }
 
-    uint32_t ref_count() const
+
+    bool valid() const
+    {
+        return control_ != nullptr;
+    }
+
+    void dispose()
+    {
+        _decref();
+        control_ = nullptr;
+    }
+
+    size_t ref_count() const
     {
         return control_->ref_count_;
     }
 
-    // true if data is external source.
-    // (constructed by copy_on_write_memory(const void* data, size_t capacity, ...) )
-    bool is_foreign_memory() const
-    {
-        return control_->flags_.is_foreign_;
-    }
-
-    static void default_on_release(value_type* data, size_t size, size_t capacity)
-    {
-        _destroy(data, data + size);
-        allocator_type().deallocate(data, capacity);
-    }
-
 protected:
-    struct control_block
-    {
-        std::atomic<uint32_t> ref_count_{ 1 };
-        struct {
-            uint32_t is_foreign_ : 1;
-        } flags_{};
-        release_handler on_release_;
-        size_t capacity_ = 0;
-        size_t size_ = 0;
-        value_type* data_ = nullptr;
-    };
-
     size_t _capacity() const { return control_->capacity_; }
     size_t& _size() { return control_->size_; }
     size_t _size() const { return control_->size_; }
     value_type* _data() const { return control_->data_; }
-
-    void _decref()
-    {
-        if (--control_->ref_count_ == 0) {
-            if (control_->on_release_) {
-                control_->on_release_(control_->data_, control_->size_, control_->capacity_);
-            }
-
-            // clear for debug
-            control_->capacity_ = control_->size_ = 0;
-            control_->data_ = nullptr;
-
-            delete control_;
-            control_ = nullptr;
-        }
-    }
 
     void _copy_on_write()
     {
         if (control_->ref_count_ > 1) {
             auto old = control_;
             auto control_ = new control_block();
-            control_->on_release_ = &default_on_release;
+            control_->on_release_ = &_release_owned_memory;
             if (old->data_) {
                 _resize_capacity(old->size_);
                 _copy_content(old->data_, old->size_, control_->data_, control_->capacity_, control_->size_);
             }
         }
-    }
-
-    value_type* _allocate(size_t size)
-    {
-        return size == 0 ? nullptr : allocator_type().allocate(size);
-    }
-
-    void _deallocate(value_type* data, size_t size)
-    {
-        allocator_type().deallocate(data, size);
     }
 
     void _resize_capacity(size_t new_capaity)
@@ -648,6 +606,48 @@ protected:
     }
 
 private:
+    static void _release_owned_memory(value_type* data, size_t size, size_t capacity)
+    {
+        _destroy(data, data + size);
+        allocator_type().deallocate(data, capacity);
+    }
+
+    value_type* _allocate(size_t size)
+    {
+        return size == 0 ? nullptr : allocator_type().allocate(size);
+    }
+
+    void _deallocate(value_type* data, size_t size)
+    {
+        allocator_type().deallocate(data, size);
+    }
+
+    void _decref()
+    {
+        if (control_ && --control_->ref_count_ == 0) {
+            if (control_->on_release_) {
+                control_->on_release_(control_->data_, control_->size_, control_->capacity_);
+            }
+
+            // clear for debug
+            control_->capacity_ = control_->size_ = 0;
+            control_->data_ = nullptr;
+
+            delete control_;
+            control_ = nullptr;
+        }
+    }
+
+private:
+    struct control_block
+    {
+        std::atomic<size_t> ref_count_{ 1 };
+        release_handler on_release_;
+        size_t capacity_ = 0;
+        size_t size_ = 0;
+        value_type* data_ = nullptr;
+    };
+
     control_block* control_ = nullptr;
 };
 

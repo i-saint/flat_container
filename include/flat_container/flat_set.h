@@ -61,7 +61,7 @@ public:
     basic_set& operator=(const container_type& v)
     {
         data_ = v.data_;
-        sort();
+        _sort();
         return *this;
     }
 
@@ -83,7 +83,7 @@ public:
     void swap(container_type& v) noexcept
     {
         data_.swap(v);
-        sort();
+        _sort();
     }
 
     const container_type& get() const { return data_; }
@@ -108,6 +108,10 @@ public:
     const_iterator end() const noexcept { return data_.end(); }
     constexpr const_iterator cend() const noexcept { return data_.cend(); }
 
+    // as_const()
+    constexpr const basic_set& as_const() const { return *this; }
+
+    // lower_bound()
     iterator lower_bound(const value_type& v)
     {
         return std::lower_bound(begin(), end(), v, key_compare());
@@ -127,6 +131,7 @@ public:
         return std::lower_bound(begin(), end(), v, C());
     }
 
+    // upper_bound()
     iterator upper_bound(const value_type& v)
     {
         return std::upper_bound(begin(), end(), v, key_compare());
@@ -146,6 +151,7 @@ public:
         return std::upper_bound(begin(), end(), v, C());
     }
 
+    // equal_range()
     std::pair<iterator, iterator> equal_range(const value_type& v)
     {
         return std::equal_range(begin(), end(), v, key_compare());
@@ -165,15 +171,16 @@ public:
         return std::equal_range(begin(), end(), v, C());
     }
 
+    // find()
     iterator find(const value_type& v)
     {
         auto it = lower_bound(v);
-        return (it != end() && equal(*it, v)) ? it : end();
+        return (it != end() && _equal(*it, v)) ? it : end();
     }
     const_iterator find(const value_type& v) const
     {
         auto it = lower_bound(v);
-        return (it != end() && equal(*it, v)) ? it : end();
+        return (it != end() && _equal(*it, v)) ? it : end();
     }
     template <class V, class C = Compare, class = typename C::is_transparent>
     iterator find(const V& v)
@@ -188,6 +195,7 @@ public:
         return (it != end() && equal<value_type, V, C>(*it, v)) ? it : end();
     }
 
+    // count()
     size_t count(const value_type& v) const
     {
         return find(v) != end() ? 1 : 0;
@@ -198,12 +206,12 @@ public:
         return find<V, C>(v) != end() ? 1 : 0;
     }
 
-    // insert & erase
 
+    // insert()
     std::pair<iterator, bool> insert(const value_type& v)
     {
         auto it = lower_bound(v);
-        if (it == end() || !equal(*it, v)) {
+        if (it == end() || !_equal(*it, v)) {
             return { data_.insert(it, v), true };
         }
         else {
@@ -213,7 +221,7 @@ public:
     std::pair<iterator, bool> insert(value_type&& v)
     {
         auto it = lower_bound(v);
-        if (it == end() || !equal(*it, v)) {
+        if (it == end() || !_equal(*it, v)) {
             return { data_.insert(it, v), true };
         }
         else {
@@ -232,6 +240,7 @@ public:
         insert(list.begin(), list.end());
     }
 
+    // erase()
     iterator erase(const value_type& v)
     {
         if (auto it = find(v); it != end()) {
@@ -251,14 +260,14 @@ public:
     }
 
 private:
-    void sort() { std::sort(begin(), end(), key_compare()); }
+    void _sort() { std::sort(begin(), end(), key_compare()); }
 
-    static bool equal(const value_type& a, const value_type& b)
+    static bool _equal(const value_type& a, const value_type& b)
     {
         return !Compare()(a, b) && !Compare()(b, a);
     }
     template <class V1, class V2, class C = Compare, class = typename C::is_transparent>
-    static bool equal(const V1& a, const V2& b)
+    static bool _equal(const V1& a, const V2& b)
     {
         return !C()(a, b) && !C()(b, a);
     }
