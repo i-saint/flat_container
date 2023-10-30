@@ -99,118 +99,138 @@ public:
 
     size_type empty() const noexcept { return data_.empty(); }
     size_type size() const noexcept { return data_.size(); }
+    size_type capacity() const noexcept { return data_.capacity(); }
+
+    // data() / cdata()
     pointer data() noexcept { return data_.data(); }
     const_pointer data() const noexcept { return data_.data(); }
+    const_pointer cdata() const noexcept { return data_.data(); }
+
+    // begin() / cbegin()
     iterator begin() noexcept { return data_.begin(); }
     const_iterator begin() const noexcept { return data_.begin(); }
     constexpr const_iterator cbegin() const noexcept { return data_.cbegin(); }
+
+    // end() / cend()
     iterator end() noexcept { return data_.end(); }
     const_iterator end() const noexcept { return data_.end(); }
     constexpr const_iterator cend() const noexcept { return data_.cend(); }
+
 
     // as_const()
     constexpr const basic_map& as_const() const { return *this; }
 
     // lower_bound()
-    iterator lower_bound(const key_type& v)
+    iterator lower_bound(const key_type& k)
     {
-        return std::lower_bound(begin(), end(), v, cmp_first<>());
+        return std::lower_bound(begin(), end(), k, _key_compare());
     }
-    const_iterator lower_bound(const key_type& v) const
+    const_iterator lower_bound(const key_type& k) const
     {
-        return std::lower_bound(begin(), end(), v, cmp_first<>());
+        return std::lower_bound(begin(), end(), k, _key_compare());
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    iterator lower_bound(const V& v)
+    template <class K>
+    iterator lower_bound(const K& k)
     {
-        return std::lower_bound(begin(), end(), v, cmp_first<C>());
+        return std::lower_bound(begin(), end(), k, _key_compare());
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    const_iterator lower_bound(const V& v) const
+    template <class K>
+    const_iterator lower_bound(const K& k) const
     {
-        return std::lower_bound(begin(), end(), v, cmp_first<C>());
+        return std::lower_bound(begin(), end(), k, _key_compare());
     }
 
     // upper_bound()
-    iterator upper_bound(const key_type& v)
+    iterator upper_bound(const key_type& k)
     {
-        return std::upper_bound(begin(), end(), v, cmp_first<>());
+        return std::upper_bound(begin(), end(), k, _key_compare());
     }
-    const_iterator upper_bound(const key_type& v) const
+    const_iterator upper_bound(const key_type& k) const
     {
-        return std::upper_bound(begin(), end(), v, cmp_first<>());
+        return std::upper_bound(begin(), end(), k, _key_compare());
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    iterator upper_bound(const V& v)
+    template <class K>
+    iterator upper_bound(const K& k)
     {
-        return std::upper_bound(begin(), end(), v, cmp_first<C>());
+        return std::upper_bound(begin(), end(), k, _key_compare());
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    const_iterator upper_bound(const V& v) const
+    template <class K>
+    const_iterator upper_bound(const K& k) const
     {
-        return std::upper_bound(begin(), end(), v, cmp_first<C>());
+        return std::upper_bound(begin(), end(), k, _key_compare());
     }
 
     // equal_range()
-    std::pair<iterator, iterator> equal_range(const key_type& v)
+    std::pair<iterator, iterator> equal_range(const key_type& k)
     {
-        return std::equal_range(begin(), end(), v, cmp_first<>());
+        return std::equal_range(begin(), end(), k, _key_compare());
     }
-    std::pair<const_iterator, const_iterator> equal_range(const key_type& v) const
+    std::pair<const_iterator, const_iterator> equal_range(const key_type& k) const
     {
-        return std::equal_range(begin(), end(), v, cmp_first<>());
+        return std::equal_range(begin(), end(), k, _key_compare());
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    std::pair<iterator, iterator> equal_range(const V& v)
+    template <class K>
+    std::pair<iterator, iterator> equal_range(const K& k)
     {
-        return std::equal_range(begin(), end(), v, cmp_first<C>());
+        return std::equal_range(begin(), end(), k, _key_compare());
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    std::pair<const_iterator, const_iterator> equal_range(const V& v) const
+    template <class K>
+    std::pair<const_iterator, const_iterator> equal_range(const K& k) const
     {
-        return std::equal_range(begin(), end(), v, cmp_first<C>());
+        return std::equal_range(begin(), end(), k, _key_compare());
     }
 
     // find()
-    iterator find(const key_type& v)
+    iterator find(const key_type& k)
     {
-        auto it = lower_bound(v);
-        return (it != end() && _equal(it->first, v)) ? it : end();
+        auto it = lower_bound(k);
+        return (it != end() && _equals(it->first, k)) ? it : end();
     }
-    const_iterator find(const key_type& v) const
+    const_iterator find(const key_type& k) const
     {
-        auto it = lower_bound(v);
-        return (it != end() && _equal(it->first, v)) ? it : end();
+        auto it = lower_bound(k);
+        return (it != end() && _equals(it->first, k)) ? it : end();
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    iterator find(const V& v)
+    template <class K>
+    iterator find(const K& k)
     {
-        auto it = lower_bound<V, C>(v);
-        return (it != end() && equal<key_type, V, C>(it->first, v)) ? it : end();
+        auto it = lower_bound<K>(k);
+        return (it != end() && _equals(it->first, k)) ? it : end();
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    const_iterator find(const V& v) const
+    template <class K>
+    const_iterator find(const K& k) const
     {
-        auto it = lower_bound<V, C>(v);
-        return (it != end() && equal<key_type, V, C>(it->first, v)) ? it : end();
+        auto it = lower_bound<K>(k);
+        return (it != end() && _equals(it->first, k)) ? it : end();
     }
 
     // count()
-    size_t count(const key_type& v) const
+    size_t count(const key_type& k) const
     {
-        return find(v) != end() ? 1 : 0;
+        return _count_keys(equal_range(k), k);
     }
-    template <class V, class C = Compare, class = typename C::is_transparent>
-    size_t count(const V& v) const
+    template <class K>
+    size_t count(const K& k) const
     {
-        return find<V, C>(v) != end() ? 1 : 0;
+        return _count_keys(equal_range(k), k);
+    }
+
+    // contains()
+    bool contains(const Key& k) const
+    {
+        return find(k) != end();
+    }
+    template<class K>
+    bool contains(const K& k) const
+    {
+        return find(k) != end();
     }
 
     // insert()
     std::pair<iterator, bool> insert(const value_type& v)
     {
         auto it = lower_bound(v.first);
-        if (it == end() || !_equal(it->first, v.first)) {
+        if (it == end() || !_equals(it->first, v.first)) {
             return { data_.insert(it, v), true };
         }
         else {
@@ -220,14 +240,14 @@ public:
     std::pair<iterator, bool> insert(value_type&& v)
     {
         auto it = lower_bound(v.first);
-        if (it == end() || !_equal(it->first, v.first)) {
+        if (it == end() || !_equals(it->first, v.first)) {
             return { data_.insert(it, std::move(v)), true };
         }
         else {
             return { it, false };
         }
     }
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter>
     void insert(Iter first, Iter last)
     {
         for (auto i = first; i != last; ++i) {
@@ -305,24 +325,40 @@ private:
         std::sort(begin(), end(), [](auto& a, auto& b) { return key_compare()(a.first, b.first); });
     }
 
-    template<class C = Compare>
-    struct cmp_first
+    template<class IterPair, class K>
+    static size_t _count_keys(const IterPair& pair, const K& key)
     {
-        template<class T>
-        bool operator()(const value_type& a, const T& b) const
+        size_t r = 0;
+        for (auto first = pair.first; first != pair.second; ++first) {
+            if (first->first == key) {
+                ++r;
+            }
+        }
+        return r;
+    }
+
+    struct _key_compare
+    {
+        template<class K>
+        bool operator()(const value_type& v, const K& k) const
         {
-            return C()(a.first, b);
+            return Compare()(v.first, k);
+        }
+        template<class K>
+        bool operator()(const K& k, const value_type& v) const
+        {
+            return Compare()(k, v.first);
         }
     };
 
-    static bool _equal(const key_type& a, const key_type& b)
+    static bool _equals(const key_type& a, const key_type& b)
     {
         return !Compare()(a, b) && !Compare()(b, a);
     }
-    template <class V1, class V2, class C = Compare, class = typename C::is_transparent>
-    static bool _equal(const V1& a, const V2& b)
+    template <class K1, class K2>
+    static bool _equals(const K1& a, const K2& b)
     {
-        return !C()(a, b) && !C()(b, a);
+        return !Compare()(a, b) && !Compare()(b, a);
     }
 
 private:

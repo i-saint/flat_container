@@ -60,7 +60,6 @@ public:
     using super::back;
 
     // as_const()
-    // mainly for remote_vector and shared_vector
     constexpr const basic_vector& as_const() const { return *this; }
 
     // resize()
@@ -109,17 +108,17 @@ public:
     {
         _copy_on_write();
         size_t n = std::distance(first, last);
-        _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
+        _assign(n, [&](pointer dst) { _copy_range(first, last, dst); });
     }
     constexpr void assign(std::initializer_list<value_type> list)
     {
         _copy_on_write();
-        _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
+        _assign(list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
     }
     constexpr void assign(size_t n, const_reference v)
     {
         _copy_on_write();
-        _assign(n, [&](pointer dst) { _fill_range(dst, v, n); });
+        _assign(n, [&](pointer dst) { _fill_range(dst, n, v); });
     }
 
     // insert()
@@ -128,17 +127,17 @@ public:
     {
         _copy_on_write();
         size_t n = std::distance(first, last);
-        return _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
+        return _insert(pos, n, [&](pointer dst) { _copy_range( first, last, dst); });
     }
     constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
         _copy_on_write();
-        return _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
+        return _insert(pos, list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
     }
     constexpr iterator insert(iterator pos, const_reference v)
     {
         _copy_on_write();
-        return _insert(pos, 1, [&](pointer addr) { _fill_range(addr, v, 1); });
+        return _insert(pos, 1, [&](pointer addr) { _fill_range(addr, 1, v); });
     }
     constexpr iterator insert(iterator pos, value_type&& v)
     {
@@ -170,11 +169,13 @@ public:
     }
 
 protected:
+    using super::_data;
+    using super::_size;
+    using super::_capacity;
     using super::_copy_on_write;
 
     using super::_copy_range;
     using super::_fill_range;
-    using super::_move_range;
     using super::_move_one;
     using super::_emplace_one;
 

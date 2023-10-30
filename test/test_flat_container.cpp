@@ -83,7 +83,7 @@ testCase(test_flat_set)
         vset.erase(v);
     };
 
-    string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", };
+    string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", "x", "z"};
     for (auto& v : data) {
         insert(v);
     }
@@ -103,6 +103,25 @@ testCase(test_flat_set)
     testExpect(!(fset > bset));
     testExpect(fset <= bset);
     testExpect(fset >= bset);
+
+    {
+        testExpect(*fset.find(std::string_view("a")) == "a");
+        testExpect(*fset.lower_bound(std::string_view("x")) == "x");
+        testExpect(*fset.lower_bound(std::string_view("y")) == "z");
+        testExpect(*fset.upper_bound(std::string_view("x")) == "z");
+        testExpect(*fset.upper_bound(std::string_view("y")) == "z");
+        testExpect(fset.contains("a"));
+        testExpect(!fset.contains("y"));
+        testExpect(fset.count("a") == 1);
+
+        auto& cfset = fset.as_const();
+        testExpect(*cfset.find(std::string_view("a")) == "a");
+        testExpect(*cfset.lower_bound(std::string_view("x")) == "x");
+        testExpect(*cfset.upper_bound(std::string_view("x")) == "z");
+        testExpect(cfset.contains("a"));
+        testExpect(!cfset.contains("y"));
+        testExpect(cfset.count("a") == 1);
+    }
 
     erase("c");
     erase("a");
@@ -181,6 +200,8 @@ testCase(test_flat_map)
         {"e", 5},
         {"c", 30},
         {"a", 1},
+        {"x", 99},
+        {"z", 999},
     };
 
     for (auto& v : data) {
@@ -202,6 +223,25 @@ testCase(test_flat_map)
     testExpect(!(fmap > bmap));
     testExpect(fmap <= bmap);
     testExpect(fmap >= bmap);
+
+    {
+        testExpect(fmap.find(std::string_view("a"))->second == 10);
+        testExpect(fmap.lower_bound(std::string_view("x"))->second == 99);
+        testExpect(fmap.lower_bound(std::string_view("y"))->second == 999);
+        testExpect(fmap.upper_bound(std::string_view("x"))->second == 999);
+        testExpect(fmap.upper_bound(std::string_view("y"))->second == 999);
+        testExpect(fmap.contains("a"));
+        testExpect(!fmap.contains("y"));
+        testExpect(fmap.count("a") == 1);
+
+        auto& cfmap = fmap.as_const();
+        testExpect(cfmap.find(std::string_view("a"))->second == 10);
+        testExpect(cfmap.lower_bound(std::string_view("x"))->second == 99);
+        testExpect(cfmap.upper_bound(std::string_view("x"))->second == 999);
+        testExpect(cfmap.contains("a"));
+        testExpect(!cfmap.contains("y"));
+        testExpect(cfmap.count("a") == 1);
+    }
 
     erase("c");
     erase("a");

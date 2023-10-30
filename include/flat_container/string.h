@@ -98,8 +98,8 @@ public:
     using super::front;
     using super::back;
 
-    constexpr const_pointer c_str() const { return data(); }
-    constexpr size_t length() const { return size(); }
+    constexpr const_pointer c_str() const { return _data(); }
+    constexpr size_t length() const { return _size(); }
 
     // as_const()
     constexpr const basic_string& as_const() const { return *this; }
@@ -143,7 +143,7 @@ public:
     // assign()
     constexpr basic_string& assign(const_pointer str, size_t n)
     {
-        _assign(n, [&](pointer dst) { _copy_range(dst, str, str + n); });
+        _assign(n, [&](pointer dst) { _copy_range(str, str + n, dst); });
         _null_terminate();
         return *this;
     }
@@ -153,13 +153,13 @@ public:
     }
     constexpr basic_string& assign(size_t n, value_type ch)
     {
-        _assign(n, [&](pointer dst) { _fill_range(dst, ch, n); });
+        _assign(n, [&](pointer dst) { _fill_range(dst, n, ch); });
         _null_terminate();
         return *this;
     }
     constexpr basic_string& assign(std::initializer_list<value_type> list)
     {
-        _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
+        _assign(list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
         _null_terminate();
         return *this;
     }
@@ -167,7 +167,7 @@ public:
     constexpr basic_string& assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
+        _assign(n, [&](pointer dst) { _copy_range(first, last, dst); });
         _null_terminate();
         return *this;
     }
@@ -189,7 +189,7 @@ public:
     // insert()
     constexpr iterator insert(iterator pos, const_pointer str, size_t n)
     {
-        auto r = _insert(pos, n, [&](pointer addr) { _copy_range(addr, str, str + n); });
+        auto r = _insert(pos, n, [&](pointer dst) { _copy_range(str, str + n, dst); });
         _null_terminate();
         return r;
     }
@@ -203,7 +203,7 @@ public:
     }
     constexpr iterator insert(iterator pos, size_t n, value_type v)
     {
-        auto r = _insert(pos, n, [&](pointer addr) { _fill_range(addr, v, n); });
+        auto r = _insert(pos, n, [&](pointer dst) { _fill_range(dst, n, v); });
         _null_terminate();
         return r;
     }
@@ -211,13 +211,13 @@ public:
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
-        auto r = _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
+        auto r = _insert(pos, n, [&](pointer dst) { _copy_range(first, last, dst); });
         _null_terminate();
         return r;
     }
     constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
-        auto r = _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
+        auto r = _insert(pos, list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
         _null_terminate();
         return r;
     }
@@ -227,7 +227,7 @@ public:
         size_t n = count == npos ? Traits::length(str) - offset : count;
         auto first = str;
         auto last = str + n;
-        _insert(begin() + pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
+        _insert(begin() + pos, n, [&](pointer dst) { _copy_range(first, last, dst); });
         _null_terminate();
         return *this;
     }
@@ -237,7 +237,7 @@ public:
     }
     constexpr basic_string& insert(size_t pos, size_t count, value_type ch)
     {
-        _insert(begin() + pos, count, [&](pointer addr) { _fill_range(addr, ch, count); });
+        _insert(begin() + pos, count, [&](pointer dst) { _fill_range(dst, count, ch); });
         _null_terminate();
         return *this;
     }
@@ -261,9 +261,9 @@ public:
 
     constexpr basic_string& append(const_pointer str, size_t count)
     {
-        size_t pos = size();
+        size_t pos = _size();
         resize(pos + count);
-        _copy_range(data() + pos, str, str + count);
+        _copy_range(str, str + count, _data() + pos);
         return *this;
     }
     constexpr basic_string& append(const_pointer str)
@@ -278,9 +278,9 @@ public:
     constexpr basic_string& append(Iter first, Iter last)
     {
         size_t count = std::distance(first, last);
-        size_t pos = size();
+        size_t pos = _size();
         resize(pos + count);
-        _copy_range(data() + pos, first, last);
+        _copy_range(first, last, _data() + pos);
         return *this;
     }
     constexpr basic_string& append(std::initializer_list<value_type> list)
@@ -313,7 +313,7 @@ public:
 
     constexpr iterator erase(iterator first, iterator last)
     {
-        _copy_range(first, last, end(), std::true_type{});
+        _copy_range(last, end(), first, std::true_type{});
         _shrink(std::distance(first, last));
         _null_terminate();
         return first;
@@ -324,7 +324,7 @@ public:
     }
     constexpr basic_string& erase(size_t offset = 0, size_t count = npos)
     {
-        size_t n = count == npos ? size() - offset : count;
+        size_t n = count == npos ? _size() - offset : count;
         auto first = begin() + offset;
         auto last = begin() + offset + n;
         erase(first, last);
@@ -338,7 +338,7 @@ public:
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
     {
         size_t count = std::distance(first2, last2);
-        return _replace(first, last, count, [&](pointer addr) { _copy_range(addr, first2, last2); });
+        return _replace(first, last, count, [&](pointer dst) { _copy_range(first2, last2, dst); });
     }
     constexpr basic_string& replace(iterator first, iterator last, const_pointer str, size_t count)
     {
@@ -350,7 +350,7 @@ public:
     }
     constexpr basic_string& replace(iterator first, iterator last, size_t count, value_type ch)
     {
-        return _replace(first, last, count, [&](pointer addr) { _fill_range(addr, ch, count); });
+        return _replace(first, last, count, [&](pointer dst) { _fill_range(dst, count, ch); });
     }
 
     constexpr basic_string& replace(size_t pos, size_t count, const_pointer str, size_t count2)
@@ -413,7 +413,7 @@ public:
     {
         auto it = _find_first_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
         auto r = std::distance(begin(), it);
-        return r == size() ? npos : r;
+        return r == _size() ? npos : r;
     }
     constexpr size_t find_first_of(const_pointer str, size_t pos = 0) const noexcept
     {
@@ -436,7 +436,7 @@ public:
     {
         auto it = _find_first_not_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
         auto r = std::distance(begin(), it);
-        return r == size() ? npos : r;
+        return r == _size() ? npos : r;
     }
     constexpr size_t find_first_not_of(const_pointer str, size_t pos = 0) const noexcept
     {
@@ -459,7 +459,7 @@ public:
     {
         auto it = _find_last_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
         auto r = std::distance(begin(), it);
-        return r == size() ? npos : r;
+        return r == _size() ? npos : r;
     }
     constexpr size_t find_last_of(const_pointer str, size_t pos = 0) const noexcept
     {
@@ -482,7 +482,7 @@ public:
     {
         auto it = _find_last_not_of(begin() + pos, end(), str, str + count, std::equal_to<>{});
         auto r = std::distance(begin(), it);
-        return r == size() ? npos : r;
+        return r == _size() ? npos : r;
     }
     constexpr size_t find_last_not_of(const_pointer str, size_t pos = 0) const noexcept
     {
@@ -503,18 +503,18 @@ public:
 
     constexpr bool starts_with(value_type ch) const noexcept
     {
-        return size() >= 1 && Traits::compare(data(), &ch, 1) == 0;
+        return _size() >= 1 && Traits::compare(_data(), &ch, 1) == 0;
     }
     constexpr bool starts_with(const_pointer str) const noexcept
     {
         size_t n = Traits::length(str);
-        return size() >= n && Traits::compare(data(), str, n) == 0;
+        return _size() >= n && Traits::compare(_data(), str, n) == 0;
     }
     template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr bool starts_with(const String& str) const noexcept
     {
         size_t n = str.size();
-        return size() >= n && Traits::compare(data(), str.data(), n) == 0;
+        return _size() >= n && Traits::compare(_data(), str.data(), n) == 0;
     }
 
 
@@ -522,18 +522,18 @@ public:
 
     constexpr bool ends_with(value_type ch) const noexcept
     {
-        return size() >= 1 && Traits::compare(data() + size() - 1, &ch, 1) == 0;
+        return _size() >= 1 && Traits::compare(_data() + _size() - 1, &ch, 1) == 0;
     }
     constexpr bool ends_with(const_pointer str) const noexcept
     {
         size_t n = Traits::length(str);
-        return size() >= n && Traits::compare(data() + size() - n, str, n) == 0;
+        return _size() >= n && Traits::compare(_data() + _size() - n, str, n) == 0;
     }
     template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr bool ends_with(const String& str) const noexcept
     {
         size_t n = str.size();
-        return size() >= n && Traits::compare(data() + size() - n, str.data(), n) == 0;
+        return _size() >= n && Traits::compare(_data() + _size() - n, str.data(), n) == 0;
     }
 
 
@@ -541,7 +541,7 @@ public:
 
     constexpr int compare(size_t pos1, size_t count1, const_pointer str, size_t pos2, size_t count2) const noexcept
     {
-        return Traits::compare(data() + pos1, str + pos2, std::min(count1, count2));
+        return Traits::compare(_data() + pos1, str + pos2, std::min(count1, count2));
     }
     constexpr int compare(size_t pos1, size_t count1, const_pointer str) const noexcept
     {
@@ -549,7 +549,7 @@ public:
     }
     constexpr int compare(const_pointer str) const noexcept
     {
-        return compare(0, size(), str, 0, Traits::length(str));
+        return compare(0, _size(), str, 0, Traits::length(str));
     }
 
     template<class String, fc_require(is_string_like_v<String, value_type>)>
@@ -566,7 +566,7 @@ public:
     template<class String, fc_require(is_string_like_v<String, value_type>)>
     constexpr int compare(const String& str) const noexcept
     {
-        return compare(0, size(), str, 0, str.size());
+        return compare(0, _size(), str, 0, str.size());
     }
 
 
@@ -574,8 +574,8 @@ public:
 
     constexpr basic_string substr(size_t pos = 0, size_t count = npos) const
     {
-        count = count == npos ? size() - pos : count;
-        return basic_string{ data() + pos, count };
+        count = count == npos ? _size() - pos : count;
+        return basic_string{ _data() + pos, count };
     }
 
 
@@ -583,8 +583,8 @@ public:
 
     constexpr size_t copy(pointer dest, size_t count, size_t pos = 0)
     {
-        count = count == npos ? size() - pos : count;
-        Traits::copy(dest, data() + pos, count);
+        count = count == npos ? _size() - pos : count;
+        Traits::copy(dest, _data() + pos, count);
         return count;
     }
 
@@ -593,7 +593,7 @@ public:
 
     constexpr operator std::basic_string_view<value_type, Traits>() const noexcept
     {
-        return { data(), size() };
+        return { _data(), _size() };
     }
 
 public:
@@ -651,11 +651,13 @@ public:
     }
 
 protected:
+    using super::_data;
+    using super::_size;
+    using super::_capacity;
+    using super::_copy_on_write;
+
     using super::_copy_range;
     using super::_fill_range;
-    using super::_move_range;
-    using super::_move_one;
-    using super::_emplace_one;
 
     using super::_shrink;
     using super::_expand;
@@ -665,14 +667,14 @@ protected:
 
     constexpr void _null_terminate()
     {
-        reserve(size() + 1);
-        data()[size()] = 0;
+        reserve(_size() + 1);
+        _data()[_size()] = 0;
     }
 
     constexpr size_t _find_ch(value_type ch, size_t offset) const noexcept
     {
-        const_pointer str1 = data();
-        const size_t size1 = size();
+        const_pointer str1 = _data();
+        const size_t size1 = _size();
         if (offset < size1) {
             const auto found = Traits::find(str1 + offset, size1 - offset, ch);
             if (found) {
@@ -683,8 +685,8 @@ protected:
     }
     constexpr size_t _find_str(const_pointer str2, size_t size2, size_t offset) const noexcept
     {
-        const_pointer str1 = data();
-        const size_t size1 = size();
+        const_pointer str1 = _data();
+        const size_t size1 = _size();
         if (size2 > size1 || offset > size1 - size2) {
             return npos;
         }

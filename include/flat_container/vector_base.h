@@ -202,7 +202,7 @@ protected:
     }
 
     template<class Iter, class MaybeOverlapped = std::false_type>
-    constexpr void _copy_range(iterator dst, Iter first, Iter last, MaybeOverlapped = {})
+    constexpr void _copy_range(Iter first, Iter last, iterator dst, MaybeOverlapped = {})
     {
         if constexpr (is_pod_v<value_type>) {
             if constexpr (std::is_pointer_v<Iter> && !MaybeOverlapped::value) {
@@ -224,7 +224,7 @@ protected:
             }
         }
     }
-    constexpr void _fill_range(iterator dst, const_reference v, size_t n)
+    constexpr void _fill_range(iterator dst, size_t n, const_reference v)
     {
         if constexpr (is_pod_v<value_type>) {
             auto end_assign = dst + n;
@@ -240,24 +240,6 @@ protected:
             }
             while (dst < end_construct) {
                 _construct_at<value_type>(dst++, v);
-            }
-        }
-    }
-    template<class Iter>
-    constexpr void _move_range(iterator dst, Iter first, Iter last)
-    {
-        if constexpr (is_pod_v<value_type>) {
-            _copy_range(dst, first, last);
-        }
-        else {
-            size_t n = std::distance(first, last);
-            auto end_assign = std::min(dst + n, _data() + _size());
-            auto end_construct = dst + n;
-            while (dst < end_assign) {
-                *dst++ = std::move(*first++);
-            }
-            while (dst < end_construct) {
-                _construct_at<value_type>(dst++, std::move(*first++));
             }
         }
     }

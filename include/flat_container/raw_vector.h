@@ -105,17 +105,17 @@ public:
     {
         _copy_on_write();
         size_t n = std::distance(first, last);
-        _assign(n, [&](pointer dst) { _copy_range(dst, first, last); });
+        _assign(n, [&](pointer dst) { _copy_range(first, last, dst); });
     }
     constexpr void assign(std::initializer_list<value_type> list)
     {
         _copy_on_write();
-        _assign(list.size(), [&](pointer dst) { _copy_range(dst, list.begin(), list.end()); });
+        _assign(list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
     }
     constexpr void assign(size_t n, const_reference v)
     {
         _copy_on_write();
-        _assign(n, [&](pointer dst) { _fill_range(dst, v, n); });
+        _assign(n, [&](pointer dst) { _fill_range(dst, n, v); });
     }
 
     // insert()
@@ -124,17 +124,17 @@ public:
     {
         _copy_on_write();
         size_t n = std::distance(first, last);
-        return _insert(pos, n, [&](pointer addr) { _copy_range(addr, first, last); });
+        return _insert(pos, n, [&](pointer dst) { _copy_range(first, last, dst); });
     }
     constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
     {
         _copy_on_write();
-        return _insert(pos, list.size(), [&](pointer addr) { _copy_range(addr, list.begin(), list.end()); });
+        return _insert(pos, list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
     }
     constexpr iterator insert(iterator pos, const_reference v)
     {
         _copy_on_write();
-        return _insert(pos, 1, [&](pointer addr) { _fill_range(addr, v, 1); });
+        return _insert(pos, 1, [&](pointer dst) { _fill_range(dst, 1, v); });
     }
 
     // emplace()
@@ -142,14 +142,14 @@ public:
     constexpr iterator emplace(iterator pos, Args&&... args)
     {
         _copy_on_write();
-        return _insert(pos, 1, [&](pointer addr) { _emplace_one(addr, std::forward<Args>(args)...); });
+        return _insert(pos, 1, [&](pointer dst) { _emplace_one(dst, std::forward<Args>(args)...); });
     }
 
     // erase()
     constexpr iterator erase(iterator first, iterator last)
     {
         _copy_on_write();
-        _copy_range(first, last, end(), std::true_type{});
+        _copy_range(last, end(), first, std::true_type{});
         _shrink(std::distance(first, last));
         return first;
     }
@@ -163,8 +163,6 @@ protected:
     using super::_copy_on_write;
     using super::_copy_range;
     using super::_fill_range;
-    using super::_move_range;
-    using super::_move_one;
     using super::_emplace_one;
 
     using super::_shrink;
