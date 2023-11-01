@@ -120,18 +120,18 @@ public:
 
     // insert()
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
-    constexpr iterator insert(iterator pos, Iter first, Iter last)
+    constexpr iterator insert(const_iterator pos, Iter first, Iter last)
     {
         _copy_on_write();
         size_t n = std::distance(first, last);
         return _insert(pos, n, [&](pointer dst) { _copy_range(first, last, dst); });
     }
-    constexpr iterator insert(iterator pos, std::initializer_list<value_type> list)
+    constexpr iterator insert(const_iterator pos, std::initializer_list<value_type> list)
     {
         _copy_on_write();
         return _insert(pos, list.size(), [&](pointer dst) { _copy_range(list.begin(), list.end(), dst); });
     }
-    constexpr iterator insert(iterator pos, const_reference v)
+    constexpr iterator insert(const_iterator pos, const_reference v)
     {
         _copy_on_write();
         return _insert(pos, 1, [&](pointer dst) { _fill_range(dst, 1, v); });
@@ -139,23 +139,22 @@ public:
 
     // emplace()
     template< class... Args >
-    constexpr iterator emplace(iterator pos, Args&&... args)
+    constexpr iterator emplace(const_iterator pos, Args&&... args)
     {
         _copy_on_write();
         return _insert(pos, 1, [&](pointer dst) { _emplace_one(dst, std::forward<Args>(args)...); });
     }
 
     // erase()
-    constexpr iterator erase(iterator first, iterator last)
+    constexpr iterator erase(const_iterator first, const_iterator last)
     {
         _copy_on_write();
-        _copy_range(last, end(), first, std::true_type{});
+        _copy_range(last, cend(), iterator(first), std::true_type{});
         _shrink(std::distance(first, last));
-        return first;
+        return iterator(first);
     }
-    constexpr iterator erase(iterator pos)
+    constexpr iterator erase(const_iterator pos)
     {
-        _copy_on_write();
         return erase(pos, pos + 1);
     }
 

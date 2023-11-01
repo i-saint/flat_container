@@ -20,6 +20,10 @@ namespace ist {
 
 // type traits
 
+// std::remove_cvref_t requires C++20 so define our own.
+template<class T>
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
 template<typename T>
 constexpr bool is_pod_v = std::is_trivial_v<T>;
 

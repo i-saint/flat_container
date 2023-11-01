@@ -7,6 +7,29 @@
 
 namespace ist {
 
+template <class Key, class... Args>
+struct key_extract_map
+{
+    static constexpr bool extractable = false;
+};
+template <class Key, class Other>
+struct key_extract_map<Key, Key, Other>
+{
+    static constexpr bool extractable = true;
+    static const Key& extract(const Key& k, const Other&) noexcept {
+        return k;
+    }
+};
+template <class Key, class First, class Second>
+struct key_extract_map<Key, std::pair<First, Second>>
+{
+    static constexpr bool extractable = std::is_same_v<Key, remove_cvref_t<First>>;
+    static const Key& extract(const std::pair<First, Second>& v) {
+        return v.first;
+    }
+};
+
+
 // flat map (std::map-like sorted vector)
 template <
     class Key,
@@ -184,24 +207,24 @@ public:
     iterator find(const key_type& k)
     {
         auto it = lower_bound(k);
-        return (it != end() && _equals(it->first, k)) ? it : end();
+        return (it != cend() && _equals(it->first, k)) ? it : end();
     }
     const_iterator find(const key_type& k) const
     {
         auto it = lower_bound(k);
-        return (it != end() && _equals(it->first, k)) ? it : end();
+        return (it != cend() && _equals(it->first, k)) ? it : end();
     }
     template <class K>
     iterator find(const K& k)
     {
         auto it = lower_bound<K>(k);
-        return (it != end() && _equals(it->first, k)) ? it : end();
+        return (it != cend() && _equals(it->first, k)) ? it : end();
     }
     template <class K>
     const_iterator find(const K& k) const
     {
         auto it = lower_bound<K>(k);
-        return (it != end() && _equals(it->first, k)) ? it : end();
+        return (it != cend() && _equals(it->first, k)) ? it : end();
     }
 
     // count()
@@ -218,19 +241,19 @@ public:
     // contains()
     bool contains(const Key& k) const
     {
-        return find(k) != end();
+        return find(k) != cend();
     }
     template<class K>
     bool contains(const K& k) const
     {
-        return find(k) != end();
+        return find(k) != cend();
     }
 
     // insert()
     std::pair<iterator, bool> insert(const value_type& v)
     {
         auto it = lower_bound(v.first);
-        if (it == end() || !_equals(it->first, v.first)) {
+        if (it == cend() || !_equals(it->first, v.first)) {
             return { data_.insert(it, v), true };
         }
         else {
@@ -240,7 +263,7 @@ public:
     std::pair<iterator, bool> insert(value_type&& v)
     {
         auto it = lower_bound(v.first);
-        if (it == end() || !_equals(it->first, v.first)) {
+        if (it == cend() || !_equals(it->first, v.first)) {
             return { data_.insert(it, std::move(v)), true };
         }
         else {
@@ -259,21 +282,83 @@ public:
         insert(list.begin(), list.end());
     }
 
+    // emplace()
+    template< class... Args >
+    std::pair<iterator, bool> emplace(Args&&... args)
+    {
+        using key_extractor = key_extract_map<remove_cvref_t<Args>...>;
+        static_assert(key_extractor::extractable);
+
+        const auto& key = key_extractor::extract(args...);
+        auto it = lower_bound(key);
+        if (it != cend() && _equals(it->first, key)) {
+            // duplicate key
+            return { it, false };
+        }
+        else {
+            return {
+                data_.emplace(it, std::forward<Args>(args)...),
+                true
+            };
+        }
+    }
+
+    // emplace_hint()
+    template< class... Args >
+    iterator emplace_hint(const_iterator hint, Args&&... args)
+    {
+        using key_extractor = key_extract_map<remove_cvref_t<Args>...>;
+        static_assert(key_extractor::extractable);
+
+        const auto& key = key_extractor::extract(args...);
+        iterator it = _find_hint(hint, key);
+        if (it != cend() && _equals(it->first, key)) {
+            // duplicate key
+            return it;
+        }
+        else {
+            return data_.emplace(it, std::forward<Args>(args)...);
+        }
+    }
+
+    // try_emplace()
+    template< class... Args >
+    std::pair<iterator, bool> try_emplace(const key_type& key, Args&&... args)
+    {
+        return _try_emplace(key, std::forward<Args>(args)...);
+    }
+    template< class... Args >
+    std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args)
+    {
+        return _try_emplace(std::move(key), std::forward<Args>(args)...);
+    }
+    template< class... Args >
+    iterator try_emplace(const_iterator hint, const key_type& key, Args&&... args)
+    {
+        return _try_emplace_hint(hint, key, std::forward<Args>(args)...);
+    }
+    template< class... Args >
+    iterator try_emplace(const_iterator hint, key_type&& key, Args&&... args)
+    {
+        return _try_emplace_hint(hint, std::move(key), std::forward<Args>(args)...);
+    }
+
+
     // erase()
     iterator erase(const key_type& v)
     {
-        if (auto it = find(v); it != end()) {
+        if (auto it = find(v); it != cend()) {
             return data_.erase(it);
         }
         else {
             return end();
         }
     }
-    iterator erase(iterator pos)
+    iterator erase(const_iterator pos)
     {
         return data_.erase(pos);
     }
-    iterator erase(iterator first, iterator last)
+    iterator erase(const_iterator first, const_iterator last)
     {
         return data_.erase(first, last);
     }
@@ -281,7 +366,7 @@ public:
     // at()
     mapped_type& at(const key_type& v)
     {
-        if (auto it = find(v); it != end()) {
+        if (auto it = find(v); it != cend()) {
             return it->second;
         }
         else {
@@ -290,7 +375,7 @@ public:
     }
     const mapped_type& at(const key_type& v) const
     {
-        if (auto it = find(v); it != end()) {
+        if (auto it = find(v); it != cend()) {
             return it->second;
         }
         else {
@@ -301,21 +386,11 @@ public:
     // operator[]
     mapped_type& operator[](const key_type& v)
     {
-        if (auto it = find(v); it != end()) {
-            return it->second;
-        }
-        else {
-            return insert(value_type{ v, {} }).first->second;
-        }
+        return try_emplace(v).first->second;
     }
     mapped_type& operator[](key_type&& v)
     {
-        if (auto it = find(v); it != end()) {
-            return it->second;
-        }
-        else {
-            return insert(value_type{ v, {} }).first->second;
-        }
+        return try_emplace(std::move(v)).first->second;
     }
 
 
@@ -360,6 +435,63 @@ private:
     {
         return !Compare()(a, b) && !Compare()(b, a);
     }
+
+    iterator _find_hint(const_iterator hint, const key_type& key)
+    {
+        if (hint == cend()) {
+            return hint;
+        }
+
+        if (Compare()(hint->first, key)) {
+            auto next = ++iterator(hint);
+            if (Compare()(key, next->first)) {
+                return hint;
+            }
+            else {
+                return std::lower_bound(next, end(), key, _key_compare());
+            }
+        }
+        else {
+            return std::lower_bound(begin(), hint, key, _key_compare());
+        }
+    }
+
+    template<class K, class... Args>
+    std::pair<iterator, bool> _try_emplace(K&& key, Args&&... args)
+    {
+        auto it = lower_bound(key);
+        if (it != cend() && _equals(it->first, key)) {
+            // duplicate key
+            return { it, false };
+        }
+        else {
+            auto r = data_.emplace(it,
+                std::piecewise_construct,
+                std::forward_as_tuple(std::forward<K>(key)),
+                std::forward_as_tuple(std::forward<Args>(args)...)
+            );
+            return { r, true };
+        }
+    }
+
+    template<class K, class... Args>
+    iterator _try_emplace_hint(iterator hint, K&& key, Args&&... args)
+    {
+        auto it = _find_hint(hint, key);
+        if (it != cend() && _equals(it->first, key)) {
+            // duplicate key
+            return { it, false };
+        }
+        else {
+            auto r = data_.emplace(it,
+                std::piecewise_construct,
+                std::forward_as_tuple(std::forward<K>(key)),
+                std::forward_as_tuple(std::forward<Args>(args)...)
+            );
+            return { r, true };
+        }
+    }
+
 
 private:
     container_type data_;

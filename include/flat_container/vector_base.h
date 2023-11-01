@@ -243,6 +243,24 @@ protected:
             }
         }
     }
+    template<class Iter>
+    constexpr void _move_range(Iter first, Iter last, iterator dst)
+    {
+        if constexpr (is_pod_v<value_type>) {
+            _copy_range(dst, first, last);
+        }
+        else {
+            size_t n = std::distance(first, last);
+            auto end_assign = std::min(dst + n, _data() + _size());
+            auto end_new = dst + n;
+            while (dst < end_assign) {
+                *dst++ = std::move(*first++);
+            }
+            while (dst < end_new) {
+                _construct_at<value_type>(dst++, std::move(*first++));
+            }
+        }
+    }
     constexpr void _move_one(iterator dst, value_type&& v)
     {
         if constexpr (is_pod_v<value_type>) {
@@ -318,8 +336,9 @@ protected:
     }
 
     template<class Construct>
-    constexpr iterator _insert(iterator pos, size_t s, Construct&& construct)
+    constexpr iterator _insert(const_iterator _pos, size_t s, Construct&& construct)
     {
+        auto pos = iterator(_pos);
         size_t d = std::distance(_data(), pos);
         this->reserve(_size() + s);
         pos = _data() + d; // for the case realloc happened

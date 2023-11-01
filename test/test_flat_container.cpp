@@ -225,6 +225,9 @@ testCase(test_flat_map)
     testExpect(fmap >= bmap);
 
     {
+        std::string a = "a";
+        testExpect(fmap[a] == 10);
+        testExpect(fmap["a"] == 10);
         testExpect(fmap.find(std::string_view("a"))->second == 10);
         testExpect(fmap.lower_bound(std::string_view("x"))->second == 99);
         testExpect(fmap.lower_bound(std::string_view("y"))->second == 999);
