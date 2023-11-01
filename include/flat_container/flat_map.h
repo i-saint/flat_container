@@ -275,19 +275,33 @@ public:
     std::pair<iterator, bool> emplace(Args&&... args)
     {
         using key_extractor = key_extract_map<key_type, remove_cvref_t<Args>...>;
-        static_assert(key_extractor::extractable);
-
-        const auto& key = key_extractor::extract(args...);
-        auto it = lower_bound(key);
-        if (it != cend() && _equals(it->first, key)) {
-            // duplicate key
-            return { it, false };
+        if constexpr (key_extractor::extractable) {
+            const auto& key = key_extractor::extract(args...);
+            auto it = lower_bound(key);
+            if (it != cend() && _equals(it->first, key)) {
+                // duplicate key
+                return { it, false };
+            }
+            else {
+                return {
+                    data_.emplace(it, std::forward<Args>(args)...),
+                    true
+                };
+            }
         }
         else {
-            return {
-                data_.emplace(it, std::forward<Args>(args)...),
-                true
-            };
+            value_type tmp{ std::forward<Args>(args)... };
+            auto it = lower_bound(tmp.first);
+            if (it != cend() && _equals(it->first, tmp.first)) {
+                // duplicate key
+                return { it, false };
+            }
+            else {
+                return {
+                    data_.emplace(it, std::move(tmp)),
+                    true
+                };
+            }
         }
     }
 
@@ -296,16 +310,27 @@ public:
     iterator emplace_hint(const_iterator hint, Args&&... args)
     {
         using key_extractor = key_extract_map<key_type, remove_cvref_t<Args>...>;
-        static_assert(key_extractor::extractable);
-
-        const auto& key = key_extractor::extract(args...);
-        iterator it = _find_hint(hint, key);
-        if (it != cend() && _equals(it->first, key)) {
-            // duplicate key
-            return it;
+        if constexpr (key_extractor::extractable) {
+            const auto& key = key_extractor::extract(args...);
+            iterator it = _find_hint(hint, key);
+            if (it != cend() && _equals(it->first, key)) {
+                // duplicate key
+                return it;
+            }
+            else {
+                return data_.emplace(it, std::forward<Args>(args)...);
+            }
         }
         else {
-            return data_.emplace(it, std::forward<Args>(args)...);
+            value_type tmp{ std::forward<Args>(args)... };
+            iterator it = _find_hint(hint, tmp.first);
+            if (it != cend() && _equals(it->first, tmp.first)) {
+                // duplicate key
+                return it;
+            }
+            else {
+                return data_.emplace(it, std::move(tmp));
+            }
         }
     }
 
@@ -424,23 +449,39 @@ private:
         return !Compare()(a, b) && !Compare()(b, a);
     }
 
+    iterator remove_const(const_iterator it)
+    {
+        if constexpr (std::is_pointer_v<const_iterator>) {
+            return iterator(it);
+        }
+        else {
+            // for std::vector
+            return data_.erase(it, it);
+        }
+    }
+
     iterator _find_hint(const_iterator hint, const key_type& key)
     {
         if (hint == cend()) {
-            return hint;
+            if (empty() || Compare()((hint - 1)->first, key)) {
+                return remove_const(hint);
+            }
+            else {
+                return lower_bound(key);
+            }
         }
 
         if (Compare()(hint->first, key)) {
-            auto next = ++iterator(hint);
+            auto next = remove_const(hint + 1);
             if (Compare()(key, next->first)) {
-                return hint;
+                return remove_const(hint);
             }
             else {
                 return std::lower_bound(next, end(), key, _key_compare());
             }
         }
         else {
-            return std::lower_bound(begin(), hint, key, _key_compare());
+            return std::lower_bound(begin(), remove_const(hint), key, _key_compare());
         }
     }
 
@@ -463,20 +504,19 @@ private:
     }
 
     template<class K, class... Args>
-    iterator _try_emplace_hint(iterator hint, K&& key, Args&&... args)
+    iterator _try_emplace_hint(const_iterator hint, K&& key, Args&&... args)
     {
         auto it = _find_hint(hint, key);
         if (it != cend() && _equals(it->first, key)) {
             // duplicate key
-            return { it, false };
+            return it;
         }
         else {
-            auto r = data_.emplace(it,
+            return data_.emplace(it,
                 std::piecewise_construct,
                 std::forward_as_tuple(std::forward<K>(key)),
                 std::forward_as_tuple(std::forward<Args>(args)...)
             );
-            return { r, true };
         }
     }
 

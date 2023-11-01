@@ -263,7 +263,7 @@ public:
     }
 
     // emplace()
-    template< class... Args >
+    template<class... Args>
     std::pair<iterator, bool> emplace(Args&&... args)
     {
         using key_extractor = key_extract_set<key_type, remove_cvref_t<Args>...>;
@@ -298,14 +298,14 @@ public:
     }
 
     // emplace_hint()
-    template< class... Args >
+    template<class... Args>
     iterator emplace_hint(const_iterator hint, Args&&... args)
     {
         using key_extractor = key_extract_set<key_type, remove_cvref_t<Args>...>;
         if constexpr (key_extractor::extractable) {
             const auto& key = key_extractor::extract(args...);
             iterator it = _find_hint(hint, key);
-            if (it != cend() && _equals(it->first, key)) {
+            if (it != cend() && _equals(*it, key)) {
                 // duplicate key
                 return it;
             }
@@ -316,7 +316,7 @@ public:
         else {
             value_type tmp{ std::forward<Args>(args)... };
             iterator it = _find_hint(hint, tmp);
-            if (it != cend() && _equals(it->first, tmp)) {
+            if (it != cend() && _equals(*it, tmp)) {
                 // duplicate key
                 return it;
             }
@@ -370,23 +370,39 @@ private:
         return !Compare()(a, b) && !Compare()(b, a);
     }
 
+    iterator remove_const(const_iterator it)
+    {
+        if constexpr (std::is_pointer_v<const_iterator>) {
+            return iterator(it);
+        }
+        else {
+            // for std::vector
+            return data_.erase(it, it);
+        }
+    }
+
     iterator _find_hint(const_iterator hint, const key_type& key)
     {
         if (hint == cend()) {
-            return hint;
+            if (empty() || Compare()(*(hint - 1), key)) {
+                return remove_const(hint);
+            }
+            else {
+                return lower_bound(key);
+            }
         }
 
         if (Compare()(*hint, key)) {
-            auto next = ++iterator(hint);
+            auto next = remove_const(hint + 1);
             if (Compare()(key, *next)) {
-                return hint;
+                return remove_const(hint);
             }
             else {
                 return std::lower_bound(next, end(), key, key_compare());
             }
         }
         else {
-            return std::lower_bound(begin(), hint, key, key_compare());
+            return std::lower_bound(begin(), remove_const(hint), key, key_compare());
         }
     }
 

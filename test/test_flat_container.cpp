@@ -32,162 +32,161 @@
 using test::Timer;
 using string = std::string;
 
+template <class T>
+constexpr bool is_std_set_v = false;
+template <class... Args>
+constexpr bool is_std_set_v<std::set<Args...>> = true;
+
+template <class T>
+constexpr bool is_std_map_v = false;
+template <class... Args>
+constexpr bool is_std_map_v<std::map<Args...>> = true;
+
+
 testCase(test_flat_set)
 {
-    std::set<string> sset;
-    ist::flat_set<string> fset;
-    ist::fixed_set<string, 32> xset;
-    ist::small_set<string, 8> bset;
+    std::set<string, std::less<>> std_set;
+    ist::flat_set<string> flat_set;
+    ist::fixed_set<string, 32> fixed_set;
+    ist::small_set<string, 8> small_set;
 
-    std::byte buf[sizeof(string) * 32];
-    ist::remote_set<string> vset(buf, 32);
+    char buf[sizeof(string) * 32];
+    ist::remote_set<string> remote_set(buf, 32);
+    ist::shared_set<string> shared_set;
+
+    auto op = [&](auto&& func) {
+        func(std_set);
+        func(flat_set);
+        func(fixed_set);
+        func(small_set);
+        func(remote_set);
+        func(shared_set);
+    };
+    auto cmp = [&](auto&& func) {
+        func(std_set, flat_set);
+        func(std_set, fixed_set);
+        func(std_set, small_set);
+        func(std_set, remote_set);
+        func(std_set, shared_set);
+    };
 
     auto check = [&]() {
-        testExpect(sset.size() == fset.size());
-        testExpect(sset.size() == xset.size());
-        testExpect(sset.size() == bset.size());
-        testExpect(sset.size() == vset.size());
+        cmp([&](auto& cont1, auto& cont2) {
+            testExpect(cont1.size() == cont2.size());
 
-        auto i1 = sset.begin();
-        auto i2 = fset.begin();
-        auto i3 = xset.begin();
-        auto i4 = bset.begin();
-        auto i5 = vset.begin();
-        while (i1 != sset.end()) {
-            testExpect(*i1 == *i2);
-            testExpect(*i1 == *i3);
-            testExpect(*i1 == *i4);
-            testExpect(*i1 == *i5);
-            ++i1; ++i2; ++i3; ++i4; ++i5;
-        }
-    };
-    auto insert = [&](const string& v) {
-        sset.insert(v);
-        fset.insert(v);
-        xset.insert(v);
-        bset.insert(v);
-        vset.insert(v);
-    };
-    auto insert_il = [&](std::initializer_list<string>&& v) {
-        sset.insert(v);
-        fset.insert(v);
-        xset.insert(v);
-        bset.insert(v);
-        vset.insert(v);
-    };
-    auto erase = [&](const string& v) {
-        sset.erase(v);
-        fset.erase(v);
-        xset.erase(v);
-        bset.erase(v);
-        vset.erase(v);
+            auto i1 = cont1.begin();
+            auto i2 = cont2.begin();
+            while (i1 != cont1.end()) {
+                testExpect(*i1 == *i2);
+                ++i1; ++i2;
+            }
+            });
     };
 
     string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", "x", "z"};
-    for (auto& v : data) {
-        insert(v);
-    }
-    insert_il({ "abc", "def", "ghi", "jkl" });
+    op([&](auto& cont) {
+        for (auto& v : data) {
+            cont.insert(v);
+        }
+        cont.insert({ "abc", "def", "ghi", "jkl" });
+        cont.emplace("123456");
+        cont.emplace_hint(cont.end(), "123456");
+        });
     check();
 
-    testExpect(fset == xset);
-    testExpect(!(fset != xset));
-    testExpect(!(fset < xset));
-    testExpect(!(fset > xset));
-    testExpect(fset <= xset);
-    testExpect(fset >= xset);
+    testExpect(flat_set == fixed_set);
+    testExpect(!(flat_set != fixed_set));
+    testExpect(!(flat_set < fixed_set));
+    testExpect(!(flat_set > fixed_set));
+    testExpect(flat_set <= fixed_set);
+    testExpect(flat_set >= fixed_set);
 
-    testExpect(fset == bset);
-    testExpect(!(fset != bset));
-    testExpect(!(fset < bset));
-    testExpect(!(fset > bset));
-    testExpect(fset <= bset);
-    testExpect(fset >= bset);
+    testExpect(flat_set == small_set);
+    testExpect(!(flat_set != small_set));
+    testExpect(!(flat_set < small_set));
+    testExpect(!(flat_set > small_set));
+    testExpect(flat_set <= small_set);
+    testExpect(flat_set >= small_set);
 
-    {
-        testExpect(*fset.find(std::string_view("a")) == "a");
-        testExpect(*fset.lower_bound(std::string_view("x")) == "x");
-        testExpect(*fset.lower_bound(std::string_view("y")) == "z");
-        testExpect(*fset.upper_bound(std::string_view("x")) == "z");
-        testExpect(*fset.upper_bound(std::string_view("y")) == "z");
-        testExpect(fset.contains("a"));
-        testExpect(!fset.contains("y"));
-        testExpect(fset.count("a") == 1);
+    op([](auto& cont) {
+        constexpr bool is_std = is_std_set_v<ist::remove_cvref_t<decltype(cont)>>;
 
-        auto& cfset = fset.as_const();
-        testExpect(*cfset.find(std::string_view("a")) == "a");
-        testExpect(*cfset.lower_bound(std::string_view("x")) == "x");
-        testExpect(*cfset.upper_bound(std::string_view("x")) == "z");
-        testExpect(cfset.contains("a"));
-        testExpect(!cfset.contains("y"));
-        testExpect(cfset.count("a") == 1);
-    }
+        testExpect(*cont.find(std::string_view("a")) == "a");
+        testExpect(*cont.lower_bound(std::string_view("x")) == "x");
+        testExpect(*cont.lower_bound(std::string_view("y")) == "z");
+        testExpect(*cont.upper_bound(std::string_view("x")) == "z");
+        testExpect(*cont.upper_bound(std::string_view("y")) == "z");
+        testExpect(cont.count("a") == 1);
+        if constexpr (!is_std) {
+            // std::set::contains() requires C++20
+            testExpect(cont.contains("a"));
+            testExpect(!cont.contains("y"));
+        }
 
-    erase("c");
-    erase("a");
-    erase("x");
+        using const_t = std::add_const_t<decltype(cont)>;
+        auto& ccont = const_cast<const_t&>(cont);
+        testExpect(*ccont.find(std::string_view("a")) == "a");
+        testExpect(*ccont.lower_bound(std::string_view("x")) == "x");
+        testExpect(*ccont.upper_bound(std::string_view("x")) == "z");
+        testExpect(ccont.count("a") == 1);
+        if constexpr (!is_std) {
+            testExpect(ccont.contains("a"));
+            testExpect(!ccont.contains("y"));
+        }
+
+        });
+
+    op([](auto& set) {
+        set.erase("c");
+        set.erase("a");
+        set.erase("x");
+        });
+
     check();
 }
 
 
 testCase(test_flat_map)
 {
-    std::map<string, int> stdmap;
-    ist::flat_map<string, int> fmap;
-    ist::fixed_map<string, int, 32> xmap;
-    ist::small_map<string, int, 8> bmap;
+    std::map<string, int, std::less<>> std_map;
+    ist::flat_map<string, int> flat_map;
+    ist::fixed_map<string, int, 32> fixed_map;
+    ist::small_map<string, int, 8> small_map;
 
     std::byte buf[sizeof(std::pair<string, int>) * 32];
-    ist::remote_map<string, int> rmap(buf, 32);
+    ist::remote_map<string, int> remote_map(buf, 32);
+    ist::shared_map<string, int> shared_map;
 
-    ist::shared_map<string, int> smap;
+    auto op = [&](auto&& func) {
+        func(std_map);
+        func(flat_map);
+        func(fixed_map);
+        func(small_map);
+        func(remote_map);
+        func(shared_map);
+    };
+    auto cmp = [&](auto&& func) {
+        func(std_map, flat_map);
+        func(std_map, fixed_map);
+        func(std_map, small_map);
+        func(std_map, remote_map);
+        func(std_map, shared_map);
+    };
 
     auto check = [&]() {
-        testExpect(stdmap.size() == fmap.size());
-        testExpect(stdmap.size() == xmap.size());
-        testExpect(stdmap.size() == bmap.size());
-        testExpect(stdmap.size() == rmap.size());
-        testExpect(stdmap.size() == smap.size());
+        cmp([&](auto& cont1, auto& cont2) {
+            testExpect(cont1.size() == cont2.size());
 
-        auto i1 = stdmap.begin();
-        auto i2 = fmap.begin();
-        auto i3 = xmap.begin();
-        auto i4 = bmap.begin();
-        auto i5 = rmap.begin();
-        auto i6 = smap.begin();
-        while (i1 != stdmap.end()) {
-            testExpect(i1->first == i2->first); testExpect(i1->second == i2->second);
-            testExpect(i1->first == i3->first); testExpect(i1->second == i3->second);
-            testExpect(i1->first == i4->first); testExpect(i1->second == i4->second);
-            testExpect(i1->first == i5->first); testExpect(i1->second == i5->second);
-            testExpect(i1->first == i6->first); testExpect(i1->second == i6->second);
-            ++i1; ++i2; ++i3; ++i4; ++i5; ++i6;
-        }
+            auto i1 = cont1.begin();
+            auto i2 = cont2.begin();
+            while (i1 != cont1.end()) {
+                testExpect(i1->first == i2->first);
+                testExpect(i1->second == i2->second);
+                ++i1; ++i2;
+            }
+            });
     };
-    auto insert = [&](const std::pair<string, int>& v) {
-        stdmap.insert(v);
-        fmap.insert(v);
-        xmap.insert(v);
-        bmap.insert(v);
-        rmap.insert(v);
-        smap.insert(v);
-    };
-    auto insert_il = [&](std::initializer_list<std::pair<const string, int>>&& v) {
-        stdmap.insert(v);
-        fmap.insert(v);
-        xmap.insert(v);
-        bmap.insert(v);
-        rmap.insert(v);
-        smap.insert(v);
-    };
-    auto erase = [&](const string& v) {
-        stdmap.erase(v);
-        fmap.erase(v);
-        xmap.erase(v);
-        bmap.erase(v);
-        rmap.erase(v);
-        smap.erase(v);
-    };
+
 
     std::pair<string, int> data[]{
         {"a", 10},
@@ -203,52 +202,70 @@ testCase(test_flat_map)
         {"x", 99},
         {"z", 999},
     };
+    op([&](auto& cont) {
+        for (auto& v : data) {
+            cont.insert(v);
+        }
+        cont.insert({ {"abc", 100}, {"def", 200}, {"ghi", 300}, {"jkl", 400} });
+        cont.emplace("123456", 123456);
+        cont.emplace_hint(cont.end(), "123456", 123456);
+        cont.try_emplace("abcdefg", 123456);
+        cont.try_emplace(cont.end(), "abcdefg", 123456);
 
-    for (auto& v : data) {
-        insert(v);
-    }
-    insert_il({ {"abc", 100}, {"def", 200}, {"ghi", 300}, {"jkl", 400} });
+        });
     check();
 
-    testExpect(fmap == xmap);
-    testExpect(!(fmap != xmap));
-    testExpect(!(fmap < xmap));
-    testExpect(!(fmap > xmap));
-    testExpect(fmap <= xmap);
-    testExpect(fmap >= xmap);
+    testExpect(flat_map == fixed_map);
+    testExpect(!(flat_map != fixed_map));
+    testExpect(!(flat_map < fixed_map));
+    testExpect(!(flat_map > fixed_map));
+    testExpect(flat_map <= fixed_map);
+    testExpect(flat_map >= fixed_map);
 
-    testExpect(fmap == bmap);
-    testExpect(!(fmap != bmap));
-    testExpect(!(fmap < bmap));
-    testExpect(!(fmap > bmap));
-    testExpect(fmap <= bmap);
-    testExpect(fmap >= bmap);
+    testExpect(flat_map == small_map);
+    testExpect(!(flat_map != small_map));
+    testExpect(!(flat_map < small_map));
+    testExpect(!(flat_map > small_map));
+    testExpect(flat_map <= small_map);
+    testExpect(flat_map >= small_map);
 
-    {
+
+    op([&](auto& cont) {
+        constexpr bool is_std = is_std_map_v<ist::remove_cvref_t<decltype(cont)>>;
+
         std::string a = "a";
-        testExpect(fmap[a] == 10);
-        testExpect(fmap["a"] == 10);
-        testExpect(fmap.find(std::string_view("a"))->second == 10);
-        testExpect(fmap.lower_bound(std::string_view("x"))->second == 99);
-        testExpect(fmap.lower_bound(std::string_view("y"))->second == 999);
-        testExpect(fmap.upper_bound(std::string_view("x"))->second == 999);
-        testExpect(fmap.upper_bound(std::string_view("y"))->second == 999);
-        testExpect(fmap.contains("a"));
-        testExpect(!fmap.contains("y"));
-        testExpect(fmap.count("a") == 1);
+        testExpect(cont[a] == 10);
+        testExpect(cont["a"] == 10);
+        testExpect(cont.find(std::string_view("a"))->second == 10);
+        testExpect(cont.lower_bound(std::string_view("x"))->second == 99);
+        testExpect(cont.lower_bound(std::string_view("y"))->second == 999);
+        testExpect(cont.upper_bound(std::string_view("x"))->second == 999);
+        testExpect(cont.upper_bound(std::string_view("y"))->second == 999);
+        testExpect(cont.count("a") == 1);
+        if constexpr (!is_std) {
+            // std::map::contains() requires C++20
+            testExpect(cont.contains("a"));
+            testExpect(!cont.contains("y"));
+        }
 
-        auto& cfmap = fmap.as_const();
-        testExpect(cfmap.find(std::string_view("a"))->second == 10);
-        testExpect(cfmap.lower_bound(std::string_view("x"))->second == 99);
-        testExpect(cfmap.upper_bound(std::string_view("x"))->second == 999);
-        testExpect(cfmap.contains("a"));
-        testExpect(!cfmap.contains("y"));
-        testExpect(cfmap.count("a") == 1);
-    }
+        using const_t = std::add_const_t<decltype(cont)>;
+        auto& ccont = const_cast<const_t&>(cont);
+        testExpect(ccont.find(std::string_view("a"))->second == 10);
+        testExpect(ccont.lower_bound(std::string_view("x"))->second == 99);
+        testExpect(ccont.upper_bound(std::string_view("x"))->second == 999);
+        testExpect(ccont.count("a") == 1);
+        if constexpr (!is_std) {
+            testExpect(ccont.contains("a"));
+            testExpect(!ccont.contains("y"));
+        }
 
-    erase("c");
-    erase("a");
-    erase("x");
+        });
+
+    op([&](auto& cont) {
+        cont.erase("c");
+        cont.erase("a");
+        cont.erase("x");
+        });
     check();
 }
 
