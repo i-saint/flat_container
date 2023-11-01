@@ -6,6 +6,20 @@
 
 namespace ist {
 
+template <class Key, class... Args>
+struct key_extract_set {
+    static constexpr bool extractable = false;
+};
+
+template <class Key>
+struct key_extract_set<Key, Key> {
+    static constexpr bool extractable = true;
+    static const Key& extract(const Key& k) noexcept {
+        return k;
+    }
+};
+
+
 // flat set (aka sorted vector)
 template <
     class Key,
@@ -230,23 +244,11 @@ public:
     // insert()
     std::pair<iterator, bool> insert(const value_type& v)
     {
-        auto it = lower_bound(v);
-        if (it == end() || !_equals(*it, v)) {
-            return { data_.insert(it, v), true };
-        }
-        else {
-            return { it, false };
-        }
+        return emplace(v);
     }
     std::pair<iterator, bool> insert(value_type&& v)
     {
-        auto it = lower_bound(v);
-        if (it == end() || !_equals(*it, v)) {
-            return { data_.insert(it, v), true };
-        }
-        else {
-            return { it, false };
-        }
+        return emplace(std::move(v));
     }
     template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
     void insert(Iter first, Iter last)
@@ -258,6 +260,70 @@ public:
     void insert(std::initializer_list<value_type> list)
     {
         insert(list.begin(), list.end());
+    }
+
+    // emplace()
+    template< class... Args >
+    std::pair<iterator, bool> emplace(Args&&... args)
+    {
+        using key_extractor = key_extract_set<key_type, remove_cvref_t<Args>...>;
+        if constexpr (key_extractor::extractable) {
+            const auto& key = key_extractor::extract(args...);
+            auto it = lower_bound(key);
+            if (it != cend() && _equals(*it, key)) {
+                // duplicate key
+                return { it, false };
+            }
+            else {
+                return {
+                    data_.emplace(it, std::forward<Args>(args)...),
+                    true
+                };
+            }
+        }
+        else {
+            value_type tmp{ std::forward<Args>(args)... };
+            auto it = lower_bound(tmp);
+            if (it != cend() && _equals(*it, tmp)) {
+                // duplicate key
+                return { it, false };
+            }
+            else {
+                return {
+                    data_.emplace(it, std::move(tmp)),
+                    true
+                };
+            }
+        }
+    }
+
+    // emplace_hint()
+    template< class... Args >
+    iterator emplace_hint(const_iterator hint, Args&&... args)
+    {
+        using key_extractor = key_extract_set<key_type, remove_cvref_t<Args>...>;
+        if constexpr (key_extractor::extractable) {
+            const auto& key = key_extractor::extract(args...);
+            iterator it = _find_hint(hint, key);
+            if (it != cend() && _equals(it->first, key)) {
+                // duplicate key
+                return it;
+            }
+            else {
+                return data_.emplace(it, std::forward<Args>(args)...);
+            }
+        }
+        else {
+            value_type tmp{ std::forward<Args>(args)... };
+            iterator it = _find_hint(hint, tmp);
+            if (it != cend() && _equals(it->first, tmp)) {
+                // duplicate key
+                return it;
+            }
+            else {
+                return data_.emplace(it, std::move(tmp));
+            }
+        }
     }
 
     // erase()
@@ -302,6 +368,26 @@ private:
     static bool _equals(const K1& a, const V2& b)
     {
         return !Compare()(a, b) && !Compare()(b, a);
+    }
+
+    iterator _find_hint(const_iterator hint, const key_type& key)
+    {
+        if (hint == cend()) {
+            return hint;
+        }
+
+        if (Compare()(*hint, key)) {
+            auto next = ++iterator(hint);
+            if (Compare()(key, *next)) {
+                return hint;
+            }
+            else {
+                return std::lower_bound(next, end(), key, key_compare());
+            }
+        }
+        else {
+            return std::lower_bound(begin(), hint, key, key_compare());
+        }
     }
 
 private:

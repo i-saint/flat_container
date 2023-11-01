@@ -158,7 +158,7 @@ public:
     constexpr iterator insert_range(const_iterator pos, Container&& v)
     {
         _copy_on_write();
-        return _insert(pos, std::size(v), [&](pointer dst) { _move_range(dst, std::begin(v), std::end(v)); });
+        return _insert(pos, std::size(v), [&](pointer dst) { _move_range(std::begin(v), std::end(v), dst); });
     }
 
     // emplace()

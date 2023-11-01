@@ -252,23 +252,11 @@ public:
     // insert()
     std::pair<iterator, bool> insert(const value_type& v)
     {
-        auto it = lower_bound(v.first);
-        if (it == cend() || !_equals(it->first, v.first)) {
-            return { data_.insert(it, v), true };
-        }
-        else {
-            return { it, false };
-        }
+        return _try_emplace(v.first, v.second);
     }
     std::pair<iterator, bool> insert(value_type&& v)
     {
-        auto it = lower_bound(v.first);
-        if (it == cend() || !_equals(it->first, v.first)) {
-            return { data_.insert(it, std::move(v)), true };
-        }
-        else {
-            return { it, false };
-        }
+        return _try_emplace(std::move(v.first), std::move(v.second));
     }
     template<class Iter>
     void insert(Iter first, Iter last)
@@ -286,7 +274,7 @@ public:
     template< class... Args >
     std::pair<iterator, bool> emplace(Args&&... args)
     {
-        using key_extractor = key_extract_map<remove_cvref_t<Args>...>;
+        using key_extractor = key_extract_map<key_type, remove_cvref_t<Args>...>;
         static_assert(key_extractor::extractable);
 
         const auto& key = key_extractor::extract(args...);
@@ -307,7 +295,7 @@ public:
     template< class... Args >
     iterator emplace_hint(const_iterator hint, Args&&... args)
     {
-        using key_extractor = key_extract_map<remove_cvref_t<Args>...>;
+        using key_extractor = key_extract_map<key_type, remove_cvref_t<Args>...>;
         static_assert(key_extractor::extractable);
 
         const auto& key = key_extractor::extract(args...);
