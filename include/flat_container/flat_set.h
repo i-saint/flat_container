@@ -262,6 +262,14 @@ public:
         insert(list.begin(), list.end());
     }
 
+    // insert_range()
+    template<class Cont>
+    void insert_range(Cont&& v)
+    {
+        data_.insert_range(data_.end(), std::move(v));
+        _sort();
+    }
+
     // emplace()
     template<class... Args>
     std::pair<iterator, bool> emplace(Args&&... args)
@@ -326,6 +334,14 @@ public:
         }
     }
 
+    // merge()
+    // reference versions are not provided because it is too inefficient.
+    template<class C2>
+    void merge(basic_set<key_type, C2, container_type>&& v)
+    {
+        insert_range(std::move(v.data_));
+    }
+
     // erase()
     iterator erase(const value_type& v)
     {
@@ -362,15 +378,15 @@ private:
 
     static bool _equals(const value_type& a, const value_type& b)
     {
-        return !Compare()(a, b) && !Compare()(b, a);
+        return !key_compare()(a, b) && !key_compare()(b, a);
     }
     template <class K1, class V2>
     static bool _equals(const K1& a, const V2& b)
     {
-        return !Compare()(a, b) && !Compare()(b, a);
+        return !key_compare()(a, b) && !key_compare()(b, a);
     }
 
-    iterator remove_const(const_iterator it)
+    iterator _remove_const(const_iterator it)
     {
         if constexpr (std::is_pointer_v<const_iterator>) {
             return iterator(it);
@@ -383,26 +399,27 @@ private:
 
     iterator _find_hint(const_iterator hint, const key_type& key)
     {
+        auto mhint = _remove_const(hint);
         if (hint == cend()) {
-            if (empty() || Compare()(*(hint - 1), key)) {
-                return remove_const(hint);
+            if (empty() || key_compare()(*(hint - 1), key)) {
+                return mhint;
             }
             else {
                 return lower_bound(key);
             }
         }
 
-        if (Compare()(*hint, key)) {
-            auto next = remove_const(hint + 1);
-            if (Compare()(key, *next)) {
-                return remove_const(hint);
+        if (key_compare()(*hint, key)) {
+            auto next = mhint + 1;
+            if (key_compare()(key, *next)) {
+                return mhint;
             }
             else {
                 return std::lower_bound(next, end(), key, key_compare());
             }
         }
         else {
-            return std::lower_bound(begin(), remove_const(hint), key, key_compare());
+            return std::lower_bound(begin(), mhint, key, key_compare());
         }
     }
 

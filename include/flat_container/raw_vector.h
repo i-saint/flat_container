@@ -137,6 +137,21 @@ public:
         return _insert(pos, 1, [&](pointer dst) { _fill_range(dst, 1, v); });
     }
 
+    // insert_range()
+    template<class Cont>
+    constexpr iterator insert_range(const_iterator pos, Cont&& v)
+    {
+        _copy_on_write();
+        return _insert(pos, std::size(v), [&](pointer dst) { _move_range(std::begin(v), std::end(v), dst); });
+    }
+
+    // append_range()
+    template<class Cont>
+    constexpr void append_range(Cont&& v)
+    {
+        insert_range(end(), std::move(v));
+    }
+
     // emplace()
     template< class... Args >
     constexpr iterator emplace(const_iterator pos, Args&&... args)

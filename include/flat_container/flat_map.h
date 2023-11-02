@@ -270,6 +270,14 @@ public:
         insert(list.begin(), list.end());
     }
 
+    // insert_range()
+    template<class Cont>
+    void insert_range(Cont&& v)
+    {
+        data_.insert_range(data_.end(), std::move(v));
+        _sort();
+    }
+
     // emplace()
     template< class... Args >
     std::pair<iterator, bool> emplace(Args&&... args)
@@ -356,6 +364,15 @@ public:
         return _try_emplace_hint(hint, std::move(key), std::forward<Args>(args)...);
     }
 
+    // merge()
+    // reference versions are not provided because it is too inefficient.
+    template<class C2>
+    void merge(basic_map<key_type, mapped_type, C2, container_type>&& v)
+    {
+        data_.insert_range(data_.end(), std::move(v.data_));
+        _sort();
+    }
+
 
     // erase()
     iterator erase(const key_type& v)
@@ -430,26 +447,26 @@ private:
         template<class K>
         bool operator()(const value_type& v, const K& k) const
         {
-            return Compare()(v.first, k);
+            return key_compare()(v.first, k);
         }
         template<class K>
         bool operator()(const K& k, const value_type& v) const
         {
-            return Compare()(k, v.first);
+            return key_compare()(k, v.first);
         }
     };
 
     static bool _equals(const key_type& a, const key_type& b)
     {
-        return !Compare()(a, b) && !Compare()(b, a);
+        return !key_compare()(a, b) && !key_compare()(b, a);
     }
     template <class K1, class K2>
     static bool _equals(const K1& a, const K2& b)
     {
-        return !Compare()(a, b) && !Compare()(b, a);
+        return !key_compare()(a, b) && !key_compare()(b, a);
     }
 
-    iterator remove_const(const_iterator it)
+    iterator _remove_const(const_iterator it)
     {
         if constexpr (std::is_pointer_v<const_iterator>) {
             return iterator(it);
@@ -462,26 +479,27 @@ private:
 
     iterator _find_hint(const_iterator hint, const key_type& key)
     {
+        auto mhint = _remove_const(hint);
         if (hint == cend()) {
-            if (empty() || Compare()((hint - 1)->first, key)) {
-                return remove_const(hint);
+            if (empty() || key_compare()((hint - 1)->first, key)) {
+                return mhint;
             }
             else {
                 return lower_bound(key);
             }
         }
 
-        if (Compare()(hint->first, key)) {
-            auto next = remove_const(hint + 1);
-            if (Compare()(key, next->first)) {
-                return remove_const(hint);
+        if (key_compare()(hint->first, key)) {
+            auto next = mhint + 1;
+            if (key_compare()(key, next->first)) {
+                return mhint;
             }
             else {
                 return std::lower_bound(next, end(), key, _key_compare());
             }
         }
         else {
-            return std::lower_bound(begin(), remove_const(hint), key, _key_compare());
+            return std::lower_bound(begin(), mhint, key, _key_compare());
         }
     }
 
