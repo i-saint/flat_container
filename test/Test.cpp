@@ -154,6 +154,9 @@ static void RunTestImpl(const TestEntry& v)
     }
     catch (const std::runtime_error& e) {
         testPrint("*** failed: %s ***\n", e.what());
+#ifdef _MSC_VER
+        __debugbreak();
+#endif
     }
     auto end = Now();
     testPrint("%s end (%.2fms)\n\n", v.name.c_str(), NS2MS(end - begin));
