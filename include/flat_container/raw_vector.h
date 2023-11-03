@@ -221,11 +221,11 @@ inline bool operator>=(const basic_raw_vector<T, M1>& l, const basic_raw_vector<
 template<class T, class Allocator = std::allocator<T>>
 using raw_vector = basic_raw_vector<T, dynamic_memory<T, Allocator>>;
 
-template<class T, size_t Capacity>
-using fixed_raw_vector = basic_raw_vector<T, fixed_memory<T, Capacity>>;
+template<class T, size_t BufferCapacity>
+using fixed_raw_vector = basic_raw_vector<T, fixed_memory<T, BufferCapacity>>;
 
-template<class T, size_t Capacity, class Allocator = std::allocator<T>>
-using small_raw_vector = basic_raw_vector<T, small_memory<T, Capacity, Allocator>>;
+template<class T, size_t BufferCapacity, class Allocator = std::allocator<T>>
+using small_raw_vector = basic_raw_vector<T, small_memory<T, BufferCapacity, Allocator>>;
 
 template<class T>
 using remote_raw_vector = basic_raw_vector<T, remote_memory<T>>;

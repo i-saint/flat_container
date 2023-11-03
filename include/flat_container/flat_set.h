@@ -462,11 +462,11 @@ bool operator>=(const basic_set<K, Comp, Cont1>& l, const basic_set<K, Comp, Con
 template <class Key, class Compare = std::less<>, class Allocator = std::allocator<Key>>
 using flat_set = basic_set<Key, Compare, std::vector<Key, Allocator>>;
 
-template <class Key, size_t Capacity, class Compare = std::less<>>
-using fixed_set = basic_set<Key, Compare, fixed_vector<Key, Capacity>>;
+template <class Key, size_t BufferCapacity, class Compare = std::less<>>
+using fixed_set = basic_set<Key, Compare, fixed_vector<Key, BufferCapacity>>;
 
-template <class Key, size_t Capacity, class Compare = std::less<>, class Allocator = std::allocator<Key>>
-using small_set = basic_set<Key, Compare, small_vector<Key, Capacity, Allocator>>;
+template <class Key, size_t BufferCapacity, class Compare = std::less<>, class Allocator = std::allocator<Key>>
+using small_set = basic_set<Key, Compare, small_vector<Key, BufferCapacity, Allocator>>;
 
 template <class Key, class Compare = std::less<>>
 using remote_set = basic_set<Key, Compare, remote_vector<Key>>;

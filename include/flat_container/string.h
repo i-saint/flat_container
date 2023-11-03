@@ -839,19 +839,19 @@ template<class T, class M, class Tr>
 inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, T r)
 {
     l += r;
-    return l;
+    return std::move(l);
 }
 template<class T, class M, class Tr>
 inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const T* r)
 {
     l += r;
-    return l;
+    return std::move(l);
 }
 template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
 inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const String& r)
 {
     l += r;
-    return l;
+    return std::move(l);
 }
 
 
@@ -956,15 +956,15 @@ using wstring = basic_string<wchar_t, dynamic_memory<wchar_t>, std::char_traits<
 using u16string = basic_string<char16_t, dynamic_memory<char16_t>, std::char_traits<char16_t>>;
 using u32string = basic_string<char32_t, dynamic_memory<char32_t>, std::char_traits<char32_t>>;
 
-template<size_t Capacity> using fixed_string = basic_string<char, fixed_memory<char, Capacity>, std::char_traits<char>>;
-template<size_t Capacity> using fixed_wstring = basic_string<wchar_t, fixed_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
-template<size_t Capacity> using fixed_u16string = basic_string<char16_t, fixed_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
-template<size_t Capacity> using fixed_u32string = basic_string<char32_t, fixed_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
+template<size_t BufferCapacity> using fixed_string = basic_string<char, fixed_memory<char, BufferCapacity>, std::char_traits<char>>;
+template<size_t BufferCapacity> using fixed_wstring = basic_string<wchar_t, fixed_memory<wchar_t, BufferCapacity>, std::char_traits<wchar_t>>;
+template<size_t BufferCapacity> using fixed_u16string = basic_string<char16_t, fixed_memory<char16_t, BufferCapacity>, std::char_traits<char16_t>>;
+template<size_t BufferCapacity> using fixed_u32string = basic_string<char32_t, fixed_memory<char32_t, BufferCapacity>, std::char_traits<char32_t>>;
 
-template<size_t Capacity> using small_string = basic_string<char, small_memory<char, Capacity>, std::char_traits<char>>;
-template<size_t Capacity> using small_wstring = basic_string<wchar_t, small_memory<wchar_t, Capacity>, std::char_traits<wchar_t>>;
-template<size_t Capacity> using small_u16string = basic_string<char16_t, small_memory<char16_t, Capacity>, std::char_traits<char16_t>>;
-template<size_t Capacity> using small_u32string = basic_string<char32_t, small_memory<char32_t, Capacity>, std::char_traits<char32_t>>;
+template<size_t BufferCapacity> using small_string = basic_string<char, small_memory<char, BufferCapacity>, std::char_traits<char>>;
+template<size_t BufferCapacity> using small_wstring = basic_string<wchar_t, small_memory<wchar_t, BufferCapacity>, std::char_traits<wchar_t>>;
+template<size_t BufferCapacity> using small_u16string = basic_string<char16_t, small_memory<char16_t, BufferCapacity>, std::char_traits<char16_t>>;
+template<size_t BufferCapacity> using small_u32string = basic_string<char32_t, small_memory<char32_t, BufferCapacity>, std::char_traits<char32_t>>;
 
 using remote_string = basic_string<char, remote_memory<char>, std::char_traits<char>>;
 using remote_wstring = basic_string<wchar_t, remote_memory<wchar_t>, std::char_traits<wchar_t>>;
@@ -978,8 +978,8 @@ using shared_u32string = basic_string<char32_t, shared_memory<char32_t>, std::ch
 
 #if __cpp_char8_t
 using u8string = basic_string<char8_t, dynamic_memory<char8_t>, std::char_traits<char8_t>>;
-template<size_t Capacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
-template<size_t Capacity> using small_u8string = basic_string<char8_t, small_memory<char8_t, Capacity>, std::char_traits<char8_t>>;
+template<size_t BufferCapacity> using fixed_u8string = basic_string<char8_t, fixed_memory<char8_t, BufferCapacity>, std::char_traits<char8_t>>;
+template<size_t BufferCapacity> using small_u8string = basic_string<char8_t, small_memory<char8_t, BufferCapacity>, std::char_traits<char8_t>>;
 using remote_u8string = basic_string<char8_t, remote_memory<char8_t>, std::char_traits<char8_t>>;
 using shared_u8string = basic_string<char8_t, shared_memory<char8_t>, std::char_traits<char8_t>>;
 #endif // __cpp_char8_t

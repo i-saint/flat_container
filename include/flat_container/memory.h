@@ -64,7 +64,7 @@ inline constexpr T* _construct_at(T* p, Args&&... args)
 template<class T>
 inline void _destroy(T* first, T* last)
 {
-    if constexpr (is_pod_v<T>) {
+    if constexpr (!is_pod_v<T>) {
         if (first < last) {
             std::destroy(first, last);
         }
@@ -73,7 +73,7 @@ inline void _destroy(T* first, T* last)
 template<class T>
 inline void _destroy_at(T* dst)
 {
-    if constexpr (is_pod_v<T>) {
+    if constexpr (!is_pod_v<T>) {
         std::destroy_at(dst);
     }
 }
@@ -208,12 +208,14 @@ public:
         return *this;
     }
 
-    void swap(dynamic_memory& r)
+    void swap(dynamic_memory& r) noexcept
     {
         std::swap(capacity_, r.capacity_);
         std::swap(size_, r.size_);
         std::swap(data_, r.data_);
     }
+
+    constexpr allocator_type get_allocator() const noexcept { return allocator_type(); }
 
 protected:
     size_t _capacity() const { return capacity_; }
@@ -254,7 +256,7 @@ private:
 };
 
 // fixed size memory block
-template<class T, size_t Capacity>
+template<class T, size_t BufferCapacity>
 class fixed_memory
 {
 public:
@@ -284,12 +286,12 @@ public:
         return *this;
     }
 
-    void swap(fixed_memory& r)
+    void swap(fixed_memory& r) noexcept
     {
         _swap_content(data_, size_, r.data_, r.size_);
     }
 
-    constexpr size_t buffer_capacity() noexcept { return Capacity; }
+    constexpr size_t buffer_capacity() const noexcept { return BufferCapacity; }
 
 protected:
     size_t _capacity() const { return capacity_; }
@@ -298,18 +300,18 @@ protected:
     value_type* _data() const { return data_; }
 
 private:
-    static constexpr size_t capacity_ = Capacity;
+    static constexpr size_t capacity_ = BufferCapacity;
     size_t size_ = 0;
     value_type* data_ = reinterpret_cast<value_type*>(buffer_); // for debug and align
 
     // uninitialized in intention
-    char buffer_[sizeof(value_type) * Capacity];
+    char buffer_[sizeof(value_type) * BufferCapacity];
 };
 
 // dynamic memory with small buffer optimization.
 // if required size is smaller than internal buffer, internal buffer is used. otherwise, it behaves like dynamic_memory.
 // (many of std::string implementations use this strategy)
-template<class T, size_t Capacity, class Allocator = std::allocator<T>>
+template<class T, size_t BufferCapacity, class Allocator = std::allocator<T>>
 class small_memory
 {
 public:
@@ -348,26 +350,35 @@ public:
         return *this;
     }
 
-    void swap(small_memory& r)
+    void swap(small_memory& r) noexcept
     {
-        if ((char*)data_ != buffer_ && (char*)r.data_ != r.buffer_) {
+        if (capacity_ != BufferCapacity && r.capacity_ != BufferCapacity) {
             std::swap(capacity_, r.capacity_);
             std::swap(size_, r.size_);
             std::swap(data_, r.data_);
         }
-        else {
-            size_t max_size = std::max(size_, r.size_);
-            if (capacity_ < max_size) {
-                _resize_capacity(max_size);
-            }
-            if (r.capacity_ < max_size) {
-                r._resize_capacity(max_size);
-            }
+        else if (capacity_ == BufferCapacity && r.capacity_ == BufferCapacity) {
             _swap_content(data_, size_, r.data_, r.size_);
+        }
+        else {
+            size_t size_in_buffer = capacity_ == BufferCapacity ? size_ : 0;
+            size_t size_in_buffer_r = r.capacity_ == BufferCapacity ? r.size_ : 0;
+            _swap_content((value_type*)buffer_, size_in_buffer, (value_type*)r.buffer_, size_in_buffer_r);
+
+            std::swap(capacity_, r.capacity_);
+            std::swap(size_, r.size_);
+            std::swap(data_, r.data_);
+            if (capacity_ == BufferCapacity) {
+                data_ = reinterpret_cast<value_type*>(buffer_);
+            }
+            if (r.capacity_ == BufferCapacity) {
+                r.data_ = reinterpret_cast<value_type*>(r.buffer_);
+            }
         }
     }
 
-    constexpr size_t buffer_capacity() noexcept { return Capacity; }
+    constexpr allocator_type get_allocator() const noexcept { return allocator_type(); }
+    constexpr size_t buffer_capacity() const noexcept { return BufferCapacity; }
 
 protected:
     size_t _capacity() const { return capacity_; }
@@ -377,7 +388,7 @@ protected:
 
     void _resize_capacity(size_t new_capaity)
     {
-        new_capaity = std::max(new_capaity, Capacity);
+        new_capaity = std::max(new_capaity, BufferCapacity);
         if (capacity_ == new_capaity) {
             return;
         }
@@ -394,7 +405,7 @@ protected:
 private:
     value_type* _allocate(size_t size)
     {
-        if (size <= Capacity) {
+        if (size <= BufferCapacity) {
             return (value_type*)buffer_;
         }
         else {
@@ -410,13 +421,13 @@ private:
     }
 
 private:
-    size_t capacity_ = Capacity;
+    size_t capacity_ = BufferCapacity;
     size_t size_ = 0;
     value_type* data_ = reinterpret_cast<value_type*>(buffer_);
 
     // uninitialized in intention
     size_t pad_[1];
-    char buffer_[sizeof(value_type) * Capacity];
+    char buffer_[sizeof(value_type) * BufferCapacity];
 };
 
 // "wrap" existing memory block.
@@ -457,7 +468,7 @@ public:
         return *this;
     }
 
-    void swap(remote_memory& r)
+    void swap(remote_memory& r) noexcept
     {
         std::swap(capacity_, r.capacity_);
         std::swap(size_, r.size_);
@@ -474,6 +485,7 @@ public:
     {
         if (on_release_) {
             on_release_(data_, size_, capacity_);
+            on_release_ = {};
         }
         capacity_ = size_ = 0;
         data_ = nullptr;
@@ -524,6 +536,7 @@ public:
         : shared_memory()
     {
         control_ = new control_block();
+        control_->flags_.foreign_ = 1;
         control_->data_ = (value_type*)data;
         control_->capacity_ = capacity;
         control_->size_ = size;
@@ -537,7 +550,7 @@ public:
 
     shared_memory& operator=(const shared_memory& r)
     {
-        _decref();
+        dispose();
         control_ = r.control_;
         control_->ref_count_++;
         return *this;
@@ -550,11 +563,15 @@ public:
         return *this;
     }
 
-    void swap(shared_memory& r)
+    void swap(shared_memory& r) noexcept
     {
         std::swap(control_, r.control_);
     }
 
+    constexpr allocator_type get_allocator() const noexcept { return allocator_type(); }
+
+
+    // extension methods
 
     bool valid() const
     {
@@ -567,12 +584,38 @@ public:
         control_ = nullptr;
     }
 
-    size_t ref_count() const
+    void detach()
+    {
+        if (control_->ref_count_ > 1 || control_->flags_.foreign_) {
+            _detach();
+        }
+    }
+
+    uint32_t ref_count() const
     {
         return control_->ref_count_;
     }
 
+    // true if data is foreign source
+    // (constructed by shared_memory(const void* data, ...) and not copied yet)
+    bool is_foreign_source() const
+    {
+        return control_->flags_.foreign_;
+    }
+
 protected:
+    struct control_block
+    {
+        std::atomic<uint32_t> ref_count_{ 1 };
+        struct {
+            uint32_t foreign_ : 1;
+        } flags_{};
+        release_handler on_release_;
+        size_t capacity_ = 0;
+        size_t size_ = 0;
+        value_type* data_ = nullptr;
+    };
+
     size_t _capacity() const { return control_->capacity_; }
     size_t& _size() { return control_->size_; }
     size_t _size() const { return control_->size_; }
@@ -581,14 +624,20 @@ protected:
     void _copy_on_write()
     {
         if (control_->ref_count_ > 1) {
-            auto old = control_;
-            auto control_ = new control_block();
-            control_->on_release_ = &_release_owned_memory;
-            if (old->data_) {
-                _resize_capacity(old->size_);
-                _copy_content(old->data_, old->size_, control_->data_, control_->capacity_, control_->size_);
-            }
+            _detach();
         }
+    }
+
+    void _detach()
+    {
+        auto old = control_;
+        control_ = new control_block();
+        control_->on_release_ = &_release_owned_memory;
+        if (old->data_) {
+            _resize_capacity(old->size_);
+            _copy_content(old->data_, old->size_, control_->data_, control_->capacity_, control_->size_);
+        }
+        _decref(old);
     }
 
     void _resize_capacity(size_t new_capaity)
@@ -626,32 +675,26 @@ private:
         allocator_type().deallocate(data, size);
     }
 
+    static void _decref(control_block*& control)
+    {
+        if (control && --control->ref_count_ == 0) {
+            if (control->on_release_) {
+                control->on_release_(control->data_, control->size_, control->capacity_);
+            }
+            // clear for debug
+            control->capacity_ = control->size_ = 0;
+            control->data_ = nullptr;
+
+            delete control;
+            control = nullptr;
+        }
+    }
     void _decref()
     {
-        if (control_ && --control_->ref_count_ == 0) {
-            if (control_->on_release_) {
-                control_->on_release_(control_->data_, control_->size_, control_->capacity_);
-            }
-
-            // clear for debug
-            control_->capacity_ = control_->size_ = 0;
-            control_->data_ = nullptr;
-
-            delete control_;
-            control_ = nullptr;
-        }
+        _decref(control_);
     }
 
 private:
-    struct control_block
-    {
-        std::atomic<size_t> ref_count_{ 1 };
-        release_handler on_release_;
-        size_t capacity_ = 0;
-        size_t size_ = 0;
-        value_type* data_ = nullptr;
-    };
-
     control_block* control_ = nullptr;
 };
 

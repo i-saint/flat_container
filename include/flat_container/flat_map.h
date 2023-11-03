@@ -578,11 +578,11 @@ bool operator>=(const basic_map<K, V, Comp, Cont1>& l, const basic_map<K, V, Com
 template <class Key, class Value, class Compare = std::less<>, class Allocator = std::allocator<std::pair<Key, Value>>>
 using flat_map = basic_map<Key, Value, Compare, std::vector<std::pair<Key, Value>, Allocator>>;
 
-template <class Key, class Value, size_t Capacity, class Compare = std::less<>>
-using fixed_map = basic_map<Key, Value, Compare, fixed_vector<std::pair<Key, Value>, Capacity>>;
+template <class Key, class Value, size_t BufferCapacity, class Compare = std::less<>>
+using fixed_map = basic_map<Key, Value, Compare, fixed_vector<std::pair<Key, Value>, BufferCapacity>>;
 
-template <class Key, class Value, size_t Capacity, class Compare = std::less<>, class Allocator = std::allocator<std::pair<Key, Value>>>
-using small_map = basic_map<Key, Value, Compare, small_vector<std::pair<Key, Value>, Capacity, Allocator>>;
+template <class Key, class Value, size_t BufferCapacity, class Compare = std::less<>, class Allocator = std::allocator<std::pair<Key, Value>>>
+using small_map = basic_map<Key, Value, Compare, small_vector<std::pair<Key, Value>, BufferCapacity, Allocator>>;
 
 template <class Key, class Value, class Compare = std::less<>>
 using remote_map = basic_map<Key, Value, Compare, remote_vector<std::pair<Key, Value>>>;

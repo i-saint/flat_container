@@ -29,8 +29,59 @@
 #endif
 
 
+template<class T>
+struct counted
+{
+    static int num_alive_;
+    T data_;
+
+    counted() { ++num_alive_; }
+    counted(const counted& r) {
+        ++num_alive_;
+        operator=(r);
+    }
+    counted(counted&& r) noexcept {
+        ++num_alive_;
+        operator=(std::move(r));
+    }
+
+    template<class... Args>
+    counted(Args... args)
+        : data_(std::forward<Args>(args)...)
+    {
+        ++num_alive_;
+    }
+
+    ~counted()
+    {
+        --num_alive_;
+    }
+
+    counted& operator=(const counted& r)
+    {
+        data_ = r.data_;
+        return *this;
+    }
+    counted& operator=(counted&& r) noexcept
+    {
+        data_ = std::move(r.data_);
+        return *this;
+    }
+
+    T& get() { return data_; }
+    const T& get() const { return data_; }
+    operator T& () { return data_; }
+    operator const T& () const { return data_; }
+    bool operator==(const counted& r) const { return data_ == r.data_; }
+    bool operator!=(const counted& r) const { return data_ != r.data_; }
+};
+
+template<class T>
+int counted<T>::num_alive_ = 0;
+
 using test::Timer;
 using string = std::string;
+using counted_string = counted<string>;
 
 template <class T>
 constexpr bool is_std_set_v = false;
@@ -42,232 +93,6 @@ constexpr bool is_std_map_v = false;
 template <class... Args>
 constexpr bool is_std_map_v<std::map<Args...>> = true;
 
-
-testCase(test_flat_set)
-{
-    std::set<string, std::less<>> std_set;
-    ist::flat_set<string> flat_set;
-    ist::fixed_set<string, 32> fixed_set;
-    ist::small_set<string, 8> small_set;
-
-    char buf[sizeof(string) * 32];
-    ist::remote_set<string> remote_set(buf, 32);
-    ist::shared_set<string> shared_set;
-
-    auto op = [&](auto&& func) {
-        func(std_set);
-        func(flat_set);
-        func(fixed_set);
-        func(small_set);
-        func(remote_set);
-        func(shared_set);
-    };
-    auto cmp = [&](auto&& func) {
-        func(std_set, flat_set);
-        func(std_set, fixed_set);
-        func(std_set, small_set);
-        func(std_set, remote_set);
-        func(std_set, shared_set);
-    };
-
-    auto check = [&]() {
-        cmp([&](auto& cont1, auto& cont2) {
-            testExpect(cont1.size() == cont2.size());
-
-            auto i1 = cont1.begin();
-            auto i2 = cont2.begin();
-            while (i1 != cont1.end()) {
-                testExpect(*i1 == *i2);
-                ++i1; ++i2;
-            }
-            });
-    };
-
-    string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", "x", "z"};
-    op([&](auto& cont) {
-        for (auto& v : data) {
-            cont.insert(v);
-        }
-        cont.insert({ "abc", "def", "ghi", "jkl" });
-        cont.emplace("123456");
-        cont.emplace_hint(cont.end(), "123456");
-        });
-    check();
-
-    testExpect(flat_set == fixed_set);
-    testExpect(!(flat_set != fixed_set));
-    testExpect(!(flat_set < fixed_set));
-    testExpect(!(flat_set > fixed_set));
-    testExpect(flat_set <= fixed_set);
-    testExpect(flat_set >= fixed_set);
-
-    testExpect(flat_set == small_set);
-    testExpect(!(flat_set != small_set));
-    testExpect(!(flat_set < small_set));
-    testExpect(!(flat_set > small_set));
-    testExpect(flat_set <= small_set);
-    testExpect(flat_set >= small_set);
-
-    op([](auto& cont) {
-        constexpr bool is_std = is_std_set_v<ist::remove_cvref_t<decltype(cont)>>;
-
-        testExpect(*cont.find(std::string_view("a")) == "a");
-        testExpect(*cont.lower_bound(std::string_view("x")) == "x");
-        testExpect(*cont.lower_bound(std::string_view("y")) == "z");
-        testExpect(*cont.upper_bound(std::string_view("x")) == "z");
-        testExpect(*cont.upper_bound(std::string_view("y")) == "z");
-        testExpect(cont.count("a") == 1);
-        if constexpr (!is_std) {
-            // std::set::contains() requires C++20
-            testExpect(cont.contains("a"));
-            testExpect(!cont.contains("y"));
-        }
-
-        using const_t = std::add_const_t<decltype(cont)>;
-        auto& ccont = const_cast<const_t&>(cont);
-        testExpect(*ccont.find(std::string_view("a")) == "a");
-        testExpect(*ccont.lower_bound(std::string_view("x")) == "x");
-        testExpect(*ccont.upper_bound(std::string_view("x")) == "z");
-        testExpect(ccont.count("a") == 1);
-        if constexpr (!is_std) {
-            testExpect(ccont.contains("a"));
-            testExpect(!ccont.contains("y"));
-        }
-
-        });
-
-    op([](auto& set) {
-        set.erase("c");
-        set.erase("a");
-        set.erase("x");
-        });
-
-    check();
-}
-
-
-testCase(test_flat_map)
-{
-    std::map<string, int, std::less<>> std_map;
-    ist::flat_map<string, int> flat_map;
-    ist::fixed_map<string, int, 32> fixed_map;
-    ist::small_map<string, int, 8> small_map;
-
-    std::byte buf[sizeof(std::pair<string, int>) * 32];
-    ist::remote_map<string, int> remote_map(buf, 32);
-    ist::shared_map<string, int> shared_map;
-
-    auto op = [&](auto&& func) {
-        func(std_map);
-        func(flat_map);
-        func(fixed_map);
-        func(small_map);
-        func(remote_map);
-        func(shared_map);
-    };
-    auto cmp = [&](auto&& func) {
-        func(std_map, flat_map);
-        func(std_map, fixed_map);
-        func(std_map, small_map);
-        func(std_map, remote_map);
-        func(std_map, shared_map);
-    };
-
-    auto check = [&]() {
-        cmp([&](auto& cont1, auto& cont2) {
-            testExpect(cont1.size() == cont2.size());
-
-            auto i1 = cont1.begin();
-            auto i2 = cont2.begin();
-            while (i1 != cont1.end()) {
-                testExpect(i1->first == i2->first);
-                testExpect(i1->second == i2->second);
-                ++i1; ++i2;
-            }
-            });
-    };
-
-
-    std::pair<string, int> data[]{
-        {"a", 10},
-        {"c", 3},
-        {"e", 50},
-        {"d", 4},
-        {"b", 20},
-        {"b", 2},
-        {"d", 40},
-        {"e", 5},
-        {"c", 30},
-        {"a", 1},
-        {"x", 99},
-        {"z", 999},
-    };
-    op([&](auto& cont) {
-        for (auto& v : data) {
-            cont.insert(v);
-        }
-        cont.insert({ {"abc", 100}, {"def", 200}, {"ghi", 300}, {"jkl", 400} });
-        cont.emplace("123456", 123456);
-        cont.emplace_hint(cont.end(), "123456", 123456);
-        cont.try_emplace("abcdefg", 123456);
-        cont.try_emplace(cont.end(), "abcdefg", 123456);
-
-        });
-    check();
-
-    testExpect(flat_map == fixed_map);
-    testExpect(!(flat_map != fixed_map));
-    testExpect(!(flat_map < fixed_map));
-    testExpect(!(flat_map > fixed_map));
-    testExpect(flat_map <= fixed_map);
-    testExpect(flat_map >= fixed_map);
-
-    testExpect(flat_map == small_map);
-    testExpect(!(flat_map != small_map));
-    testExpect(!(flat_map < small_map));
-    testExpect(!(flat_map > small_map));
-    testExpect(flat_map <= small_map);
-    testExpect(flat_map >= small_map);
-
-
-    op([&](auto& cont) {
-        constexpr bool is_std = is_std_map_v<ist::remove_cvref_t<decltype(cont)>>;
-
-        std::string a = "a";
-        testExpect(cont[a] == 10);
-        testExpect(cont["a"] == 10);
-        testExpect(cont.find(std::string_view("a"))->second == 10);
-        testExpect(cont.lower_bound(std::string_view("x"))->second == 99);
-        testExpect(cont.lower_bound(std::string_view("y"))->second == 999);
-        testExpect(cont.upper_bound(std::string_view("x"))->second == 999);
-        testExpect(cont.upper_bound(std::string_view("y"))->second == 999);
-        testExpect(cont.count("a") == 1);
-        if constexpr (!is_std) {
-            // std::map::contains() requires C++20
-            testExpect(cont.contains("a"));
-            testExpect(!cont.contains("y"));
-        }
-
-        using const_t = std::add_const_t<decltype(cont)>;
-        auto& ccont = const_cast<const_t&>(cont);
-        testExpect(ccont.find(std::string_view("a"))->second == 10);
-        testExpect(ccont.lower_bound(std::string_view("x"))->second == 99);
-        testExpect(ccont.upper_bound(std::string_view("x"))->second == 999);
-        testExpect(ccont.count("a") == 1);
-        if constexpr (!is_std) {
-            testExpect(ccont.contains("a"));
-            testExpect(!ccont.contains("y"));
-        }
-
-        });
-
-    op([&](auto& cont) {
-        cont.erase("c");
-        cont.erase("a");
-        cont.erase("x");
-        });
-    check();
-}
 
 
 testCase(test_fixed_vector)
@@ -653,4 +478,264 @@ testCase(test_fixed_string)
         auto xyz = abc.substr(2, 3);
         testExpect(xyz == "xyz");
     }
+}
+
+testCase(test_small_vector)
+{
+    using vec_t = ist::small_vector<counted_string, 4>;
+    int& num_alive_ = counted_string::num_alive_;
+    {
+        vec_t vec1{ "a", "b", "c", "d" };
+        vec_t vec2{ "0", "1", "2", "3" };
+        testExpect(num_alive_ == 8);
+
+        testExpect(vec2.capacity() == 4);
+        vec2.emplace_back("4");
+        testExpect(vec2.capacity() == 8);
+        testExpect(num_alive_ == 9);
+
+        vec_t vec3 = vec2;
+        testExpect(num_alive_ == 14);
+        vec_t vec4 = std::move(vec2);
+        testExpect(vec3 == vec4);
+
+        vec_t vec5 = vec1;
+        vec1.swap(vec4);
+        testExpect(vec1 == vec3);
+        testExpect(vec4 == vec5);
+    }
+    testExpect(num_alive_ == 0);
+}
+
+
+testCase(test_shared_vector)
+{
+
+}
+
+
+testCase(test_flat_set)
+{
+    std::set<string, std::less<>> std_set;
+    ist::flat_set<string> flat_set;
+    ist::fixed_set<string, 32> fixed_set;
+    ist::small_set<string, 8> small_set;
+
+    char buf[sizeof(string) * 32];
+    ist::remote_set<string> remote_set(buf, 32);
+    ist::shared_set<string> shared_set;
+
+    auto op = [&](auto&& func) {
+        func(std_set);
+        func(flat_set);
+        func(fixed_set);
+        func(small_set);
+        func(remote_set);
+        func(shared_set);
+    };
+    auto cmp = [&](auto&& func) {
+        func(std_set, flat_set);
+        func(std_set, fixed_set);
+        func(std_set, small_set);
+        func(std_set, remote_set);
+        func(std_set, shared_set);
+    };
+
+    auto check = [&]() {
+        cmp([&](auto& cont1, auto& cont2) {
+            testExpect(cont1.size() == cont2.size());
+
+            auto i1 = cont1.begin();
+            auto i2 = cont2.begin();
+            while (i1 != cont1.end()) {
+                testExpect(*i1 == *i2);
+                ++i1; ++i2;
+            }
+            });
+    };
+
+    string data[]{ "e", "a", "e", "b", "c", "d", "c", "b", "d", "a", "x", "z" };
+    op([&](auto& cont) {
+        for (auto& v : data) {
+            cont.insert(v);
+        }
+        cont.insert({ "abc", "def", "ghi", "jkl" });
+        cont.emplace("123456");
+        cont.emplace_hint(cont.end(), "123456");
+        });
+    check();
+
+    testExpect(flat_set == fixed_set);
+    testExpect(!(flat_set != fixed_set));
+    testExpect(!(flat_set < fixed_set));
+    testExpect(!(flat_set > fixed_set));
+    testExpect(flat_set <= fixed_set);
+    testExpect(flat_set >= fixed_set);
+
+    testExpect(flat_set == small_set);
+    testExpect(!(flat_set != small_set));
+    testExpect(!(flat_set < small_set));
+    testExpect(!(flat_set > small_set));
+    testExpect(flat_set <= small_set);
+    testExpect(flat_set >= small_set);
+
+    op([](auto& cont) {
+        constexpr bool is_std = is_std_set_v<ist::remove_cvref_t<decltype(cont)>>;
+
+        testExpect(*cont.find(std::string_view("a")) == "a");
+        testExpect(*cont.lower_bound(std::string_view("x")) == "x");
+        testExpect(*cont.lower_bound(std::string_view("y")) == "z");
+        testExpect(*cont.upper_bound(std::string_view("x")) == "z");
+        testExpect(*cont.upper_bound(std::string_view("y")) == "z");
+        testExpect(cont.count("a") == 1);
+        if constexpr (!is_std) {
+            // std::set::contains() requires C++20
+            testExpect(cont.contains("a"));
+            testExpect(!cont.contains("y"));
+        }
+
+        using const_t = std::add_const_t<decltype(cont)>;
+        auto& ccont = const_cast<const_t&>(cont);
+        testExpect(*ccont.find(std::string_view("a")) == "a");
+        testExpect(*ccont.lower_bound(std::string_view("x")) == "x");
+        testExpect(*ccont.upper_bound(std::string_view("x")) == "z");
+        testExpect(ccont.count("a") == 1);
+        if constexpr (!is_std) {
+            testExpect(ccont.contains("a"));
+            testExpect(!ccont.contains("y"));
+        }
+
+        });
+
+    op([](auto& set) {
+        set.erase("c");
+        set.erase("a");
+        set.erase("x");
+        });
+
+    check();
+}
+
+
+testCase(test_flat_map)
+{
+    std::map<string, int, std::less<>> std_map;
+    ist::flat_map<string, int> flat_map;
+    ist::fixed_map<string, int, 32> fixed_map;
+    ist::small_map<string, int, 8> small_map;
+
+    std::byte buf[sizeof(std::pair<string, int>) * 32];
+    ist::remote_map<string, int> remote_map(buf, 32);
+    ist::shared_map<string, int> shared_map;
+
+    auto op = [&](auto&& func) {
+        func(std_map);
+        func(flat_map);
+        func(fixed_map);
+        func(small_map);
+        func(remote_map);
+        func(shared_map);
+    };
+    auto cmp = [&](auto&& func) {
+        func(std_map, flat_map);
+        func(std_map, fixed_map);
+        func(std_map, small_map);
+        func(std_map, remote_map);
+        func(std_map, shared_map);
+    };
+
+    auto check = [&]() {
+        cmp([&](auto& cont1, auto& cont2) {
+            testExpect(cont1.size() == cont2.size());
+
+            auto i1 = cont1.begin();
+            auto i2 = cont2.begin();
+            while (i1 != cont1.end()) {
+                testExpect(i1->first == i2->first);
+                testExpect(i1->second == i2->second);
+                ++i1; ++i2;
+            }
+            });
+    };
+
+
+    std::pair<string, int> data[]{
+        {"a", 10},
+        {"c", 3},
+        {"e", 50},
+        {"d", 4},
+        {"b", 20},
+        {"b", 2},
+        {"d", 40},
+        {"e", 5},
+        {"c", 30},
+        {"a", 1},
+        {"x", 99},
+        {"z", 999},
+    };
+    op([&](auto& cont) {
+        for (auto& v : data) {
+            cont.insert(v);
+        }
+        cont.insert({ {"abc", 100}, {"def", 200}, {"ghi", 300}, {"jkl", 400} });
+        cont.emplace("123456", 123456);
+        cont.emplace_hint(cont.end(), "123456", 123456);
+        cont.try_emplace("abcdefg", 123456);
+        cont.try_emplace(cont.end(), "abcdefg", 123456);
+
+        });
+    check();
+
+    testExpect(flat_map == fixed_map);
+    testExpect(!(flat_map != fixed_map));
+    testExpect(!(flat_map < fixed_map));
+    testExpect(!(flat_map > fixed_map));
+    testExpect(flat_map <= fixed_map);
+    testExpect(flat_map >= fixed_map);
+
+    testExpect(flat_map == small_map);
+    testExpect(!(flat_map != small_map));
+    testExpect(!(flat_map < small_map));
+    testExpect(!(flat_map > small_map));
+    testExpect(flat_map <= small_map);
+    testExpect(flat_map >= small_map);
+
+
+    op([&](auto& cont) {
+        constexpr bool is_std = is_std_map_v<ist::remove_cvref_t<decltype(cont)>>;
+
+        std::string a = "a";
+        testExpect(cont[a] == 10);
+        testExpect(cont["a"] == 10);
+        testExpect(cont.find(std::string_view("a"))->second == 10);
+        testExpect(cont.lower_bound(std::string_view("x"))->second == 99);
+        testExpect(cont.lower_bound(std::string_view("y"))->second == 999);
+        testExpect(cont.upper_bound(std::string_view("x"))->second == 999);
+        testExpect(cont.upper_bound(std::string_view("y"))->second == 999);
+        testExpect(cont.count("a") == 1);
+        if constexpr (!is_std) {
+            // std::map::contains() requires C++20
+            testExpect(cont.contains("a"));
+            testExpect(!cont.contains("y"));
+        }
+
+        using const_t = std::add_const_t<decltype(cont)>;
+        auto& ccont = const_cast<const_t&>(cont);
+        testExpect(ccont.find(std::string_view("a"))->second == 10);
+        testExpect(ccont.lower_bound(std::string_view("x"))->second == 99);
+        testExpect(ccont.upper_bound(std::string_view("x"))->second == 999);
+        testExpect(ccont.count("a") == 1);
+        if constexpr (!is_std) {
+            testExpect(ccont.contains("a"));
+            testExpect(!ccont.contains("y"));
+        }
+
+        });
+
+    op([&](auto& cont) {
+        cont.erase("c");
+        cont.erase("a");
+        cont.erase("x");
+        });
+    check();
 }
