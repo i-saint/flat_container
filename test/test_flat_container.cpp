@@ -30,35 +30,36 @@
 
 
 template<class T>
-struct counted : public T
+class counted : public T
 {
+public:
     using super = T;
-    static int num_alive_;
+    static const int& instance_count() { return instance_count_; }
 
     counted()
     {
-        ++num_alive_;
+        ++instance_count_;
     }
     counted(const counted& r)
         : super(r)
     {
-        ++num_alive_;
+        ++instance_count_;
     }
     counted(counted&& r) noexcept
         : super(std::move(r))
     {
-        ++num_alive_;
+        ++instance_count_;
     }
     template<class... Args>
     counted(Args&&... args)
         : super(std::forward<Args>(args)...)
     {
-        ++num_alive_;
+        ++instance_count_;
     }
 
     ~counted()
     {
-        --num_alive_;
+        --instance_count_;
     }
 
     counted& operator=(const counted& r)
@@ -77,10 +78,13 @@ struct counted : public T
         super::operator=(std::forward<Args>(args)...);
         return *this;
     }
+
+protected:
+    static int instance_count_;
 };
 
 template<class T>
-int counted<T>::num_alive_ = 0;
+int counted<T>::instance_count_ = 0;
 
 using test::Timer;
 using string = std::string;
@@ -123,17 +127,19 @@ testCase(test_fixed_vector)
     static_assert(!ist::has_copy_on_write_v<ist::remote_vector<int>>);
     static_assert( ist::has_copy_on_write_v<ist::shared_vector<int>>);
 
+    auto& cs_count = cstring::instance_count();
+    testExpect(cs_count == 0);
     {
         // basic tests
-        ist::fixed_vector<string, 128> data, data2, data3;
-        ist::small_vector<string, 32> sdata;
-        ist::vector<string> ddata;
+        ist::fixed_vector<cstring, 128> data, data2, data3;
+        ist::small_vector<cstring, 32> sdata;
+        ist::vector<cstring> ddata;
 
-        std::byte buf[sizeof(string) * 128];
-        ist::remote_vector<string> vdata(buf, 128);
+        std::byte buf[sizeof(cstring) * 128];
+        ist::remote_vector<cstring> vdata(buf, 128);
 
         auto make_data = [](auto& dst) {
-            string tmp;
+            cstring tmp;
             for (int i = 0; i < 64; ++i) {
                 tmp += ' ' + char(i);
 
@@ -148,7 +154,7 @@ testCase(test_fixed_vector)
                 case 3: dst.resize(dst.size() + 1, tmp); break;
                 case 4: dst.insert(dst.begin(), tmp); break;
                 case 5: dst.insert(dst.begin(), &tmp, &tmp + 1); break;
-                case 6: dst.insert(dst.begin(), std::initializer_list<string>{tmp}); break;
+                case 6: dst.insert(dst.begin(), std::initializer_list<cstring>{tmp}); break;
                 case 7: dst.erase(dst.begin() + dst.size() / 2); break;
                 case 8: dst.emplace(dst.begin() + dst.size() / 2, tmp.c_str(), tmp.size()); break;
                 }
@@ -203,13 +209,14 @@ testCase(test_fixed_vector)
             testExpect(v == data2[0]);
         }
     }
+    testExpect(cs_count == 0);
 
     {
         // with non-copyable element
         class elem
         {
         public:
-            elem(const string& v) : value(v) {}
+            elem(const cstring& v) : value(v) {}
             elem(const char* str, size_t len) : value(str, len) {}
             elem() = delete;
             elem(const elem&) = delete;
@@ -218,7 +225,7 @@ testCase(test_fixed_vector)
             elem& operator=(elem&&) = default;
             bool operator==(const elem& v) const { return value == v.value; }
 
-            string value;
+            cstring value;
         };
 
         ist::fixed_vector<elem, 128> data, data2, data3, data4;
@@ -259,6 +266,7 @@ testCase(test_fixed_vector)
             testExpect(data[i] == data4[i]);
         }
     }
+    testExpect(cs_count == 0);
 }
 
 testCase(test_fixed_raw_vector)
@@ -485,21 +493,21 @@ testCase(test_fixed_string)
 testCase(test_small_vector)
 {
     using vec_t = ist::small_vector<cstring, 4>;
-    int& num_alive_ = cstring::num_alive_;
+    auto& cs_count = cstring::instance_count();
 
-    testExpect(num_alive_ == 0);
+    testExpect(cs_count == 0);
     {
         vec_t vec1{ "a", "b", "c", "d" };
         vec_t vec2{ "0", "1", "2", "3" };
-        testExpect(num_alive_ == 8);
+        testExpect(cs_count == 8);
 
         testExpect(vec2.capacity() == 4);
         vec2.emplace_back("4");
         testExpect(vec2.capacity() == 8);
-        testExpect(num_alive_ == 9);
+        testExpect(cs_count == 9);
 
         vec_t vec3 = vec2;
-        testExpect(num_alive_ == 14);
+        testExpect(cs_count == 14);
         vec_t vec4 = std::move(vec2);
         testExpect(vec3 == vec4);
 
@@ -508,7 +516,7 @@ testCase(test_small_vector)
         testExpect(vec1 == vec3);
         testExpect(vec4 == vec5);
     }
-    testExpect(num_alive_ == 0);
+    testExpect(cs_count == 0);
 }
 
 
@@ -520,8 +528,8 @@ testCase(test_shared_vector)
 
 testCase(test_flat_set)
 {
-    int& num_alive_ = cstring::num_alive_;
-    testExpect(num_alive_ == 0);
+    auto& cs_count = cstring::instance_count();
+    testExpect(cs_count == 0);
     {
         std::set<cstring, std::less<>> std_set;
         ist::flat_set<cstring> flat_set;
@@ -568,7 +576,10 @@ testCase(test_flat_set)
             }
             cont.insert({ "abc", "def", "ghi", "jkl" });
             cont.emplace("123456");
-            cont.emplace_hint(cont.end(), "123456");
+
+            cstring k = "123456";
+            cont.emplace_hint(cont.cend(), (const cstring&)k);
+            cont.emplace_hint(cont.cend(), std::move(k));
             });
         check();
 
@@ -622,14 +633,14 @@ testCase(test_flat_set)
 
         check();
     }
-    testExpect(num_alive_ == 0);
+    testExpect(cs_count == 0);
 }
 
 
 testCase(test_flat_map)
 {
-    int& num_alive_ = cstring::num_alive_;
-    testExpect(num_alive_ == 0);
+    auto& cs_count = cstring::instance_count();
+    testExpect(cs_count == 0);
     {
         std::map<cstring, int, std::less<>> std_map;
         ist::flat_map<cstring, int> flat_map;
@@ -691,9 +702,12 @@ testCase(test_flat_map)
             }
             cont.insert({ {"abc", 100}, {"def", 200}, {"ghi", 300}, {"jkl", 400} });
             cont.emplace("123456", 123456);
-            cont.emplace_hint(cont.end(), "123456", 123456);
+            cont.emplace_hint(cont.cend(), "123456", 123456);
             cont.try_emplace("abcdefg", 123456);
-            //cont.try_emplace(cont.end(), "abcdefg", 123456);
+
+            cstring k = "abcdefg";
+            cont.try_emplace(cont.cend(), (const cstring&)k, 123456);
+            cont.try_emplace(cont.cend(), std::move(k), 123456);
 
             });
         check();
@@ -751,5 +765,5 @@ testCase(test_flat_map)
             });
         check();
     }
-    testExpect(num_alive_ == 0);
+    testExpect(cs_count == 0);
 }

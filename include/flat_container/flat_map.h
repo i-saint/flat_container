@@ -279,7 +279,7 @@ public:
     }
 
     // emplace()
-    template< class... Args >
+    template<class... Args>
     std::pair<iterator, bool> emplace(Args&&... args)
     {
         using key_extractor = key_extract_map<key_type, remove_cvref_t<Args>...>;
@@ -314,7 +314,7 @@ public:
     }
 
     // emplace_hint()
-    template< class... Args >
+    template<class... Args>
     iterator emplace_hint(const_iterator hint, Args&&... args)
     {
         using key_extractor = key_extract_map<key_type, remove_cvref_t<Args>...>;
@@ -343,22 +343,22 @@ public:
     }
 
     // try_emplace()
-    template< class... Args >
+    template<class... Args>
     std::pair<iterator, bool> try_emplace(const key_type& key, Args&&... args)
     {
         return _try_emplace(key, std::forward<Args>(args)...);
     }
-    template< class... Args >
+    template<class... Args>
     std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args)
     {
         return _try_emplace(std::move(key), std::forward<Args>(args)...);
     }
-    template< class... Args >
+    template<class... Args>
     iterator try_emplace(const_iterator hint, const key_type& key, Args&&... args)
     {
         return _try_emplace_hint(hint, key, std::forward<Args>(args)...);
     }
-    template< class... Args >
+    template<class... Args>
     iterator try_emplace(const_iterator hint, key_type&& key, Args&&... args)
     {
         return _try_emplace_hint(hint, std::move(key), std::forward<Args>(args)...);
