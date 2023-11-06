@@ -38,8 +38,7 @@ public:
     template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
     constexpr basic_vector(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
-    {
-    }
+    {}
 
     using super::capacity;
     using super::size;

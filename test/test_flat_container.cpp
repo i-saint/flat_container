@@ -119,13 +119,13 @@ testCase(test_fixed_vector)
     static_assert(!ist::has_remote_memory_v<ist::fixed_vector<int, 8>>);
     static_assert(!ist::has_remote_memory_v<ist::small_vector<int, 8>>);
     static_assert( ist::has_remote_memory_v<ist::remote_vector<int>>);
-    static_assert( ist::has_remote_memory_v<ist::shared_vector<int>>);
+    static_assert(!ist::has_remote_memory_v<ist::shared_vector<int>>);
 
-    static_assert(!ist::has_copy_on_write_v<ist::vector<int>>);
-    static_assert(!ist::has_copy_on_write_v<ist::fixed_vector<int, 8>>);
-    static_assert(!ist::has_copy_on_write_v<ist::small_vector<int, 8>>);
-    static_assert(!ist::has_copy_on_write_v<ist::remote_vector<int>>);
-    static_assert( ist::has_copy_on_write_v<ist::shared_vector<int>>);
+    static_assert(!ist::has_shared_memory_v<ist::vector<int>>);
+    static_assert(!ist::has_shared_memory_v<ist::fixed_vector<int, 8>>);
+    static_assert(!ist::has_shared_memory_v<ist::small_vector<int, 8>>);
+    static_assert(!ist::has_shared_memory_v<ist::remote_vector<int>>);
+    static_assert( ist::has_shared_memory_v<ist::shared_vector<int>>);
 
     auto& cs_count = cstring::instance_count();
     testExpect(cs_count == 0);
@@ -492,10 +492,10 @@ testCase(test_fixed_string)
 
 testCase(test_small_vector)
 {
-    using vec_t = ist::small_vector<cstring, 4>;
     auto& cs_count = cstring::instance_count();
-
     testExpect(cs_count == 0);
+
+    using vec_t = ist::small_vector<cstring, 4>;
     {
         vec_t vec1{ "a", "b", "c", "d" };
         vec_t vec2{ "0", "1", "2", "3" };
@@ -522,7 +522,31 @@ testCase(test_small_vector)
 
 testCase(test_shared_vector)
 {
+    auto& cs_count = cstring::instance_count();
+    testExpect(cs_count == 0);
 
+    using vec_t = ist::shared_vector<cstring>;
+    {
+        vec_t vec1{ "a", "b", "c", "d" };
+        vec_t vec2{ "0", "1", "2", "3" };
+        testExpect(cs_count == 8);
+
+        testExpect(vec2.capacity() == 4);
+        vec2.emplace_back("4");
+        testExpect(vec2.capacity() == 8);
+        testExpect(cs_count == 9);
+
+        vec_t vec3 = vec2;
+        vec_t vec4 = std::move(vec2);
+        testExpect(vec3 == vec4);
+        testExpect(cs_count == 9);
+
+        vec_t vec5 = vec1;
+        vec1.swap(vec4);
+        testExpect(vec1 == vec3);
+        testExpect(vec4 == vec5);
+    }
+    testExpect(cs_count == 0);
 }
 
 

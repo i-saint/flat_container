@@ -49,9 +49,9 @@ template <class T>
 constexpr bool has_remote_memory_v<T, std::enable_if_t<T::has_remote_memory>> = true;
 
 template <class T, class = void>
-constexpr bool has_copy_on_write_v = false;
+constexpr bool has_shared_memory_v = false;
 template <class T>
-constexpr bool has_copy_on_write_v<T, std::enable_if_t<T::has_copy_on_write>> = true;
+constexpr bool has_shared_memory_v<T, std::enable_if_t<T::has_shared_memory>> = true;
 
 
 // std::construct_at() requires c++20 so define our own.
@@ -521,8 +521,7 @@ public:
     using release_handler = std::function<void(value_type* data, size_t size, size_t capacity)>;
 
     static constexpr bool has_resize_capacity = true;
-    static constexpr bool has_remote_memory = true;
-    static constexpr bool has_copy_on_write = true;
+    static constexpr bool has_shared_memory = true;
 
     shared_memory()
     {

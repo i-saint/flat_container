@@ -196,7 +196,7 @@ protected:
 
     void _copy_on_write()
     {
-        if constexpr (has_copy_on_write_v<super>) {
+        if constexpr (has_shared_memory_v<super>) {
             super::_copy_on_write();
         }
     }

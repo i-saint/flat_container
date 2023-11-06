@@ -65,6 +65,7 @@
     <Expand>
       <Item Name="[size]">control_->size_</Item>
       <Item Name="[capacity]">control_->capacity_</Item>
+      <Item Name="[ref count]">control_->ref_count_</Item>
       <ArrayItems>
         <Size>control_->size_</Size>
         <ValuePointer>control_->data_</ValuePointer>
