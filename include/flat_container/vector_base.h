@@ -36,7 +36,7 @@ public:
     // reserve()
     void reserve(size_t n)
     {
-        if constexpr (has_resize_capacity_v<super>) {
+        if constexpr (has_dynamic_memory_v<super>) {
             if (n > _capacity()) {
                 _copy_on_write();
                 size_t new_capaity = std::max<size_t>(n, _capacity() * 2);
@@ -48,7 +48,7 @@ public:
     // shrink_to_fit()
     void shrink_to_fit()
     {
-        if constexpr (has_resize_capacity_v<super>) {
+        if constexpr (has_dynamic_memory_v<super>) {
             if (_size() != _capacity()) {
                 _copy_on_write();
                 super::_resize_capacity(_size());

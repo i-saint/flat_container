@@ -34,14 +34,14 @@ constexpr bool is_iterator_of_v<Iter, T, typename std::enable_if_t<std::is_same_
 
 
 template <class T, class = void>
-constexpr bool has_resize_capacity_v = false;
+constexpr bool has_dynamic_memory_v = false;
 template <class T>
-constexpr bool has_resize_capacity_v<T, std::enable_if_t<T::has_resize_capacity>> = true;
+constexpr bool has_dynamic_memory_v<T, std::enable_if_t<T::has_dynamic_memory>> = true;
 
 template <class T, class = void>
-constexpr bool has_inner_buffer_v = false;
+constexpr bool has_fixed_memory_v = false;
 template <class T>
-constexpr bool has_inner_buffer_v<T, std::enable_if_t<T::has_inner_buffer>> = true;
+constexpr bool has_fixed_memory_v<T, std::enable_if_t<T::has_fixed_memory>> = true;
 
 template <class T, class = void>
 constexpr bool has_remote_memory_v = false;
@@ -177,7 +177,7 @@ class dynamic_memory
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    static constexpr bool has_resize_capacity = true;
+    static constexpr bool has_dynamic_memory = true;
 
     dynamic_memory() = default;
     dynamic_memory(const dynamic_memory& r) { operator=(r); }
@@ -261,7 +261,7 @@ class fixed_memory
 {
 public:
     using value_type = T;
-    static constexpr bool has_inner_buffer = true;
+    static constexpr bool has_fixed_memory = true;
     static_assert(alignof(value_type) <= 16);
 
     fixed_memory() = default;
@@ -317,8 +317,8 @@ class small_memory
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    static constexpr bool has_resize_capacity = true;
-    static constexpr bool has_inner_buffer = true;
+    static constexpr bool has_dynamic_memory = true;
+    static constexpr bool has_fixed_memory = true;
     static_assert(alignof(value_type) <= 16);
 
     small_memory() = default;
@@ -520,7 +520,7 @@ public:
     using allocator_type = Allocator;
     using release_handler = std::function<void(value_type* data, size_t size, size_t capacity)>;
 
-    static constexpr bool has_resize_capacity = true;
+    static constexpr bool has_dynamic_memory = true;
     static constexpr bool has_shared_memory = true;
 
     shared_memory()

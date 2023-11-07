@@ -103,17 +103,17 @@ constexpr bool is_std_map_v<std::map<Args...>> = true;
 
 testCase(test_fixed_vector)
 {
-    static_assert( ist::has_resize_capacity_v<ist::vector<int>>);
-    static_assert(!ist::has_resize_capacity_v<ist::fixed_vector<int, 8>>);
-    static_assert( ist::has_resize_capacity_v<ist::small_vector<int, 8>>);
-    static_assert(!ist::has_resize_capacity_v<ist::remote_vector<int>>);
-    static_assert( ist::has_resize_capacity_v<ist::shared_vector<int>>);
+    static_assert( ist::has_dynamic_memory_v<ist::vector<int>>);
+    static_assert(!ist::has_dynamic_memory_v<ist::fixed_vector<int, 8>>);
+    static_assert( ist::has_dynamic_memory_v<ist::small_vector<int, 8>>);
+    static_assert(!ist::has_dynamic_memory_v<ist::remote_vector<int>>);
+    static_assert( ist::has_dynamic_memory_v<ist::shared_vector<int>>);
 
-    static_assert(!ist::has_inner_buffer_v<ist::vector<int>>);
-    static_assert( ist::has_inner_buffer_v<ist::fixed_vector<int, 8>>);
-    static_assert( ist::has_inner_buffer_v<ist::small_vector<int, 8>>);
-    static_assert(!ist::has_inner_buffer_v<ist::remote_vector<int>>);
-    static_assert(!ist::has_inner_buffer_v<ist::shared_vector<int>>);
+    static_assert(!ist::has_fixed_memory_v<ist::vector<int>>);
+    static_assert( ist::has_fixed_memory_v<ist::fixed_vector<int, 8>>);
+    static_assert( ist::has_fixed_memory_v<ist::small_vector<int, 8>>);
+    static_assert(!ist::has_fixed_memory_v<ist::remote_vector<int>>);
+    static_assert(!ist::has_fixed_memory_v<ist::shared_vector<int>>);
 
     static_assert(!ist::has_remote_memory_v<ist::vector<int>>);
     static_assert(!ist::has_remote_memory_v<ist::fixed_vector<int, 8>>);
