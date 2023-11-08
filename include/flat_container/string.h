@@ -44,25 +44,25 @@ public:
     basic_string(basic_string&& r) noexcept { operator=(std::move(r)); }
     basic_string(const basic_string& r) { operator=(r); }
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(size_t n, value_type ch) { assign(n, ch); }
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(const_pointer v) { assign(v); }
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(const_pointer v, size_t n) { assign(v, n); }
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
+    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(Iter first, Iter last) { assign(first, last); }
 
-    template<class String, bool cond = !has_remote_memory_v<super> && is_string_like_v<String, value_type>, fc_require(cond)>
+    template<class String, bool cond = !has_remote_memory_v<super> && is_string_like_v<String, value_type>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(const String& str) { assign(str); }
 
-    template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_string(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
         , basic_string()
@@ -163,7 +163,7 @@ public:
         _null_terminate();
         return *this;
     }
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     constexpr basic_string& assign(Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -171,7 +171,7 @@ public:
         _null_terminate();
         return *this;
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& assign(const String& str, size_t offset, size_t count = npos)
     {
         size_t n = count == npos ? str.size() - offset : count;
@@ -179,7 +179,7 @@ public:
         auto last = str.begin() + offset + n;
         return assign(first, last);
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& assign(const String& str)
     {
         return assign(str, 0, npos);
@@ -207,7 +207,7 @@ public:
         _null_terminate();
         return r;
     }
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     constexpr iterator insert(iterator pos, Iter first, Iter last)
     {
         size_t n = std::distance(first, last);
@@ -241,7 +241,7 @@ public:
         _null_terminate();
         return *this;
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& insert(size_t pos, const String& str, size_t offset, size_t count = npos)
     {
         size_t n = count == npos ? str.size() - offset : count;
@@ -250,7 +250,7 @@ public:
         insert(begin() + pos, first, last);
         return *this;
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& insert(size_t pos, const String& str)
     {
         return insert(pos, str, 0, npos);
@@ -274,7 +274,7 @@ public:
     {
         return append(&ch, 1);
     }
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     constexpr basic_string& append(Iter first, Iter last)
     {
         size_t count = std::distance(first, last);
@@ -287,12 +287,12 @@ public:
     {
         return append(list.begin(), list.end());
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& append(const String& str)
     {
         return append(str.begin(), str.end());
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& append(const String& str, size_t offset, size_t count = npos)
     {
         count = count == npos ? str.size() - offset : count;
@@ -305,7 +305,7 @@ public:
     constexpr basic_string& operator+=(value_type ch) { return append(ch); }
     constexpr basic_string& operator+=(const_pointer str) { return append(str); }
     constexpr basic_string& operator+=(std::initializer_list<value_type> list) { return append(list); }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& operator+=(const String& str) { return append(str); }
 
 
@@ -334,7 +334,7 @@ public:
 
     // replace()
 
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     constexpr basic_string& replace(iterator first, iterator last, Iter first2, Iter last2)
     {
         size_t count = std::distance(first2, last2);
@@ -369,7 +369,7 @@ public:
         auto last = begin() + pos + count;
         return replace(first, last, list.begin(), list.end());
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& replace(size_t pos, size_t count, const String& str, size_t pos2, size_t count2 = npos)
     {
         auto first = begin() + pos;
@@ -379,7 +379,7 @@ public:
         auto last2 = str.begin() + pos2 + n;
         return replace(first, last, first2, last2);
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr basic_string& replace(size_t pos, size_t count, const String& str)
     {
         return replace(pos, count, str, 0, str.size());
@@ -400,7 +400,7 @@ public:
     {
         return _find_ch(ch, pos);
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr size_t find(const String& str, size_t pos = 0) const noexcept
     {
         return _find_str(str.data(), str.size(), pos);
@@ -419,7 +419,7 @@ public:
     {
         return find_first_of(str, pos, Traits::length(str));
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr size_t find_first_of(const String& str, size_t pos = 0) const noexcept
     {
         return find_first_of(str.data(), pos, str.size());
@@ -442,7 +442,7 @@ public:
     {
         return find_first_not_of(str, pos, Traits::length(str));
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr size_t find_first_not_of(const String& str, size_t pos = 0) const noexcept
     {
         return find_first_not_of(str.data(), pos, str.size());
@@ -465,7 +465,7 @@ public:
     {
         return find_last_of(str, pos, Traits::length(str));
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr size_t find_last_of(const String& str, size_t pos = 0) const noexcept
     {
         return find_last_of(str.data(), pos, str.size());
@@ -488,7 +488,7 @@ public:
     {
         return find_last_not_of(str, pos, Traits::length(str));
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr size_t find_last_not_of(const String& str, size_t pos = 0) const noexcept
     {
         return find_last_not_of(str.data(), pos, str.size());
@@ -510,7 +510,7 @@ public:
         size_t n = Traits::length(str);
         return _size() >= n && Traits::compare(_data(), str, n) == 0;
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr bool starts_with(const String& str) const noexcept
     {
         size_t n = str.size();
@@ -529,7 +529,7 @@ public:
         size_t n = Traits::length(str);
         return _size() >= n && Traits::compare(_data() + _size() - n, str, n) == 0;
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr bool ends_with(const String& str) const noexcept
     {
         size_t n = str.size();
@@ -552,18 +552,18 @@ public:
         return compare(0, _size(), str, 0, Traits::length(str));
     }
 
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr int compare(size_t pos1, size_t count1, const String& str, size_t pos2, size_t count2 = npos) const noexcept
     {
         count2 = count2 == npos ? str.size() - pos2 : count2;
         return compare(pos1, count1, str.data(), pos2, count2);
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr int compare(size_t pos1, size_t count1, const String& str) const noexcept
     {
         return compare(pos1, count1, str, 0, str.size());
     }
-    template<class String, fc_require(is_string_like_v<String, value_type>)>
+    template<class String, std::enable_if_t<is_string_like_v<String, value_type>, int> = 0>
     constexpr int compare(const String& str) const noexcept
     {
         return compare(0, _size(), str, 0, str.size());
@@ -597,7 +597,7 @@ public:
     }
 
 public:
-    template<class Number, fc_require(std::is_integral_v<Number>)>
+    template<class Number, std::enable_if_t<std::is_integral_v<Number>, int> = 0>
     inline Number to_number(size_t* idx, int base) const
     {
         auto first = begin();
@@ -620,7 +620,7 @@ public:
         }
     }
 
-    template<class Number, fc_require(std::is_floating_point_v<Number>)>
+    template<class Number, std::enable_if_t<std::is_floating_point_v<Number>, int> = 0>
     inline Number to_number(size_t* idx) const
     {
         auto first = begin();
@@ -822,14 +822,14 @@ inline basic_string<T, M, Tr> operator+(const T* l, const basic_string<T, M, Tr>
     return basic_string<T, M, Tr>{l} + r;
 }
 
-template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
+template<class T, class M, class Tr, class String, std::enable_if_t<is_string_like_v<String, T>, int> = 0>
 inline basic_string<T, M, Tr> operator+(const basic_string<T, M, Tr>& l, const String& r)
 {
     basic_string<T, M, Tr> tmp{l};
     tmp += r;
     return tmp;
 }
-template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
+template<class T, class M, class Tr, class String, std::enable_if_t<is_string_like_v<String, T>, int> = 0>
 inline basic_string<T, M, Tr> operator+(const String& l, const basic_string<T, M, Tr>& r)
 {
     return basic_string<T, M, Tr>{l} + r;
@@ -847,7 +847,7 @@ inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const T* r)
     l += r;
     return std::move(l);
 }
-template<class T, class M, class Tr, class String, fc_require(is_string_like_v<String, T>)>
+template<class T, class M, class Tr, class String, std::enable_if_t<is_string_like_v<String, T>, int> = 0>
 inline basic_string<T, M, Tr> operator+(basic_string<T, M, Tr>&& l, const String& r)
 {
     l += r;

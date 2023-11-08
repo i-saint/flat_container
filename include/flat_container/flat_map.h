@@ -60,18 +60,18 @@ public:
     basic_map(const basic_map& v) { operator=(v); }
     basic_map(const container_type& v) { operator=(v); }
 
-    template <class Iter, bool cond = !has_remote_memory_v<container_type> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
+    template <class Iter, bool cond = !has_remote_memory_v<container_type> && is_iterator_of_v<Iter, value_type>, std::enable_if_t<cond, int> = 0>
     basic_map(Iter first, Iter last)
     {
         insert(first, last);
     }
-    template <bool cond = !has_remote_memory_v<container_type>, fc_require(cond)>
+    template <bool cond = !has_remote_memory_v<container_type>, std::enable_if_t<cond, int> = 0>
     basic_map(std::initializer_list<value_type> list)
     {
         insert(list);
     }
 
-    template<bool cond = has_remote_memory_v<container_type>, fc_require(cond)>
+    template<bool cond = has_remote_memory_v<container_type>, std::enable_if_t<cond, int> = 0>
     basic_map(void* data, size_t capacity, size_t size = 0)
         : data_(data, capacity, size)
     {
@@ -258,7 +258,7 @@ public:
     {
         return _try_emplace(std::move(v.first), std::move(v.second));
     }
-    template<class Iter>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     void insert(Iter first, Iter last)
     {
         for (auto i = first; i != last; ++i) {

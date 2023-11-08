@@ -14,8 +14,6 @@
 #   endif
 #endif
 
-#define fc_require(...) std::enable_if_t<__VA_ARGS__, bool> = true
-
 namespace ist {
 
 // type traits
@@ -30,7 +28,7 @@ constexpr bool is_pod_v = std::is_trivial_v<T>;
 template<class Iter, class T, class = void>
 constexpr bool is_iterator_of_v = false;
 template<class Iter, class T>
-constexpr bool is_iterator_of_v<Iter, T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<typename std::iterator_traits<Iter>::value_type>, T>> > = true;
+constexpr bool is_iterator_of_v<Iter, T, std::enable_if_t<std::is_same_v<std::remove_const_t<typename std::iterator_traits<Iter>::value_type>, T>> > = true;
 
 
 template <class T, class = void>

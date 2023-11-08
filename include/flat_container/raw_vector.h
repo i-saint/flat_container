@@ -25,19 +25,19 @@ public:
     constexpr basic_raw_vector(const basic_raw_vector& r) = default;
     constexpr basic_raw_vector& operator=(const basic_raw_vector& r) = default;
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr explicit basic_raw_vector(size_t n) { resize(n); }
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_raw_vector(size_t n, const_reference v) { resize(n, v); }
 
-    template<bool cond = !has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = !has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_raw_vector(std::initializer_list<value_type> r) { assign(r); }
 
-    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, fc_require(cond)>
+    template<class Iter, bool cond = !has_remote_memory_v<super> && is_iterator_of_v<Iter, value_type>, std::enable_if_t<cond, int> = 0>
     constexpr basic_raw_vector(Iter first, Iter last) { assign(first, last); }
 
-    template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr basic_raw_vector(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
@@ -100,7 +100,7 @@ public:
     }
 
     // assign()
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     constexpr void assign(Iter first, Iter last)
     {
         _copy_on_write();
@@ -119,7 +119,7 @@ public:
     }
 
     // insert()
-    template<class Iter, fc_require(is_iterator_of_v<Iter, value_type>)>
+    template<class Iter, std::enable_if_t<is_iterator_of_v<Iter, value_type>, int> = 0>
     constexpr iterator insert(const_iterator pos, Iter first, Iter last)
     {
         _copy_on_write();

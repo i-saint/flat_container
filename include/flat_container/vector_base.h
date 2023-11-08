@@ -27,7 +27,7 @@ public:
     constexpr vector_base(const vector_base& r) = default;
     constexpr vector_base& operator=(const vector_base& r) = default;
 
-    template<bool cond = has_remote_memory_v<super>, fc_require(cond)>
+    template<bool cond = has_remote_memory_v<super>, std::enable_if_t<cond, int> = 0>
     constexpr vector_base(const void* data, size_t capacity, size_t size = 0)
         : super(data, capacity, size)
     {
